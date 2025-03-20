@@ -1,0 +1,11 @@
+services:
+  db:
+    image: postgres:17.3-bullseye
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: user
+      POSTGRES_DB: issues
+    ports:
+      - 5432:5432
+

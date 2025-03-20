@@ -1,0 +1,79 @@
+---
+title: Create a Test Project
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+These lessons will all assume you are using .NET 9.0 or later, and that you have the .NET SDK installed. You can check this by running `dotnet --version` in your terminal.
+If you don't have the .NET SDK installed, you can download it from the [.NET website](https://dotnet.microsoft.com/download/dotnet/9.0).
+
+If you are more comfortable using a specific IDE, like Visual Studio, Rider, or whatever, you can gloss the steps here and accomplish the setup with your IDE of choice.
+
+I'm going to use the .NET CLI to create a solution and a project, and then add the necessary packages to the project.
+
+We are going to start with a solution with just an XUnit test project, and through the lessons, we'll add more projects to the solution, including an API project. But we are going to start "inside", and "small".
+
+## Create a Solution And Project
+
+<Steps>
+1. Create a new directory for the solution
+
+    Find a place to store your work, and create a new directory for the solution. 
+    ```bash
+    mkdir CritterStack
+    cd CritterStack
+    ```
+1. Create a new solution
+    ```bash
+    dotnet new sln -n HelpDeskSolution
+    ```
+2. Create a new test project
+    ```bash
+    dotnet new xunit -n HelpDesk.Tests
+    ```
+3. Add the test project to the solution
+    ```bash
+    dotnet sln add HelpDesk.Tests 
+    ```
+4. Add the Marten Nuget Package To the Test Project
+    ```bash
+    cd HelpDesk.Tests
+    dotnet add package Marten
+    ```
+</Steps>
+
+## We Are Going To Need a Database
+
+We are going to need a PostgreSQL database to run the tests against. We will run our database in a container, so make sure you have a container runtime installed (Docker Desktop, Podman, etc).
+
+If you are unfamiliar with containers, I recommend using Docker Desktop, and I really like the Docker extension in Visual Studio Code.  [Read About it Here](https://code.visualstudio.com/docs/containers/overview)
+
+We'll use Docker Compose to run the database, and we'll add a `docker-compose.yml` file to the solution root.
+
+```yaml
+services:
+  db:
+    image: postgres:17.3-bullseye
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: password
+      POSTGRES_USER: user
+      POSTGRES_DB: issues
+    ports:
+      - 5432:5432
+
+```
+
+Start your database with the following command, or if you are in VSCode you can right-click on the `docker-compose.yml` file and select "Compose Up".
+
+Other IDEs may have similar functionality - use what you like.
+
+If you are starting it from the command line, in the solution root, run the following command:
+```bash
+docker compose up -d
+```
+
+:::tip 
+It may take a bit to start up if you don't have that particular container image already on your machine. 
+After it is downloaded, you won't have to wait like this again.
+:::
