@@ -13,7 +13,16 @@ export default defineConfig({
       sidebar: [
 		{
 			label: "Lessons",
-			autogenerate: { directory: "lessons" },
+		
+			items: [
+				{ label: "Overview", link: "/lessons/01-overview" },
+				{ label: "Events", autogenerate: { directory: "lessons/Events" } },
+				{ label: "Messages", autogenerate: { directory: "lessons/Messages" } },
+				{ label: "APIs", autogenerate: { directory: "lessons/APIs" } },
+
+
+			
+			],
 		},
 		{
 			label: "How-to Guides",
