@@ -4,6 +4,8 @@ title: Create a Test Project
 
 import { Steps } from '@astrojs/starlight/components';
 
+import { FileTree } from '@astrojs/starlight/components';
+
 These lessons will all assume you are using .NET 9.0 or later, and that you have the .NET SDK installed. You can check this by running `dotnet --version` in your terminal.
 If you don't have the .NET SDK installed, you can download it from the [.NET website](https://dotnet.microsoft.com/download/dotnet/9.0).
 
@@ -77,3 +79,15 @@ docker compose up -d
 It may take a bit to start up if you don't have that particular container image already on your machine. 
 After it is downloaded, you won't have to wait like this again.
 :::
+
+At the end of this, you should have a file structure similar to this:
+
+<FileTree>
+- CritterStack
+  - docker-compose.yml
+  - HelpDeskSolution.sln
+  - HelpDesk.Tests
+    - HelpDesk.Tests.csproj
+    - UnitTest1.cs
+
+</FileTree>

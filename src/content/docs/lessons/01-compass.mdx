@@ -1,9 +1,83 @@
 ---
-title: What We'll Learn 
+title: What We'll Build 
 ---
+
+We are going to build a "full stack" application using the Critter Stack. We won't use *every* feature of the Critter Stack, but we will go on a journey where you can start the think about how it might be a great choice for your next application.
+
+## The Application
+
+:::note
+In order to make this as realistic as possible, and as close the "the" real world (or at least mine!), we are *not* going to start with a lot of well thought-out, complete requirements.
+
+In the "real world" (thank God) applications are designed and built over time, through iterations. That is how we will approach this.
+:::
+
+
+### Issue Tracker
+
+So, we are going to build an Issue Tracker application. Here's the high-level:
+
+#### Narrative
+
+We will build a web application, with an HTTP API. It will have a user interface that allows users to create issues with software our "company" supports.
+The web application with be built with .NET 9, and the API will be built with ASP.NET Core with Marten and Wolverine (members of the Critter Stack).
+
+
+When a problem with a specific piece of software is reported by a user, it will be "triaged" by a support tech, and the user will be contacted to get the issue resolved.
+
+Sometimes the issue will be a bug in the software, and not something that can be resolved (but maybe a work around). If those issues are not resolved, they will be escalated to the team that works with the vendors of the software.
+
+It will have a user interface (a web app, written in Angular), but creating that will not be a focus of this training. It will be provided when the time comes.
+
+#### About Demo Code and Reference Apps
+
+> **"Demo Code is Really Hard"**
+>
+>   &nbsp;  &nbsp; &nbsp; -  Jeremy Miller, [Critter Stack Creator]
+
+I agree with Jeremy on this. Along with writing software, I've been teaching others software development for almost 30 years. If you make your demo code too simple, it doesn't show the real-world problems you are trying to solve. If you make it too complex, it becomes hard to follow and understand.
+
+Another problem Jeremy and I have discussed often is the absolute desire to *never* create any kind of "reference app". Those are often too complex, and too hard to follow. They are often built by a team of people, and they are often built over a long period of time, and represent the learning of a specific team, working in a specific domain.
+
+So, we are going to build a simple issue tracker. This is a common problem that many people have, and it is something that I have built many times over the years. And we don't need to talk about it a lot. Most of us are familiar with that domain. 
+
+I do a lot of work with developers in the insurance industry, and I'll admit I rarely have much understanding of what they are doing. I can read the code, but I don't understand the business domain.
+
+
+The thing I really appreciate the *most* about the Critter Stack is that it provides me with a way to start at the "thick end of the wedge", so to speak. I can start writing code *right away* that has a natural alignment with the 
+business domain I'm working in. The longer I've used it, the more often I've found that if I am having a hard time expressing something in code, using the conventions of the Critter Stack, it's usually because I am not thinking about my problem space in the right way.
+
+I've seen Jeremy and other members of the Critter Stack community struggle with this in the community support Discord channel. Someone will have their hair on fire with a question, some code they just can't get to do what they want it to do. 
+
+The temptation is always to put the fire out, and help them get their code working. But the real value is in helping them reconsider what they are trying to do. Software is magical - we can convince computers to do almost anything we want them to do. 
+We can even convince them to do things that are *wrong*. But that pile of *wrong* gets big fast. We sometimes discard this reality by pulling the "Legacy Code" trump card, and demand a "refactoring sprint".
+
+## Opinions
+
+The approach I am going to show you here, like the Critter Stack itself is **opinionated**. Of *course* you can pick and choose different tidbits of things shown here and apply them to your code. It *might* be great, or at least fine.
+
+Those Opinions Are:
+
+- We never know what is coming next. 
+  - We prove software by releasing it in iterations, observing its use in the wild, and then adjusting our code to meet the needs of our users and the ever-changing needs of the business.
+- The best way I know to do this is to use well-known patterns like *Event Sourcing*, and *CQRS*. 
+- When something happens in our system, it almost never means just one thing needs to happen in response to that. Or at least it doesn't stay that way for long.
+  - We like simple "cause and effect" - but the real world is messy.
+  - For example, when a user is created, we might want to send them a welcome email, and we might want to send a notification to the support team.
+  - Next month, we might want to send a notification to the marketing team, and we might want to send a notification to the sales team.
+- This is a way "good code" goes bad. You end up with a pile of code that is hard to follow, and hard to change, with tons of `if/else` and `switch` statements. Testing becomes impossible, so you start to avoid it.
+- Good software is easy to test. I heard (or read?) Michael Feathers once say "Testing is easy in the presence of good design". At the time, I was *aghast*. My code is *awesome* but my tests *suck*!. It certainly can't be my fault!
+  - He was right. If your code is hard to test, it's because your code (design) sucks. 
+
 
 I'll admit: I had a hard time getting started building an application with the Critter Stack. I had a lot of enthusiasm, a lot of experience, but I found in many places that experience - that was hard earned and had severed me
 well - was a hindrance to me. I had to unlearn a lot of things that I thought I knew about building applications.
+
+I did my typical thing: I just jumped in and tried stuff. My `projects` directory is full of half-finished projects that I started, and then abandoned. I tried to build a "real" application, but I found that I was trying to use the Critter Stack as a "library" instead of a "framework".
+I didn't take the time to learn how to "Think in Critter Stack". I was trying to use it as a library, and I was trying to make it fit into my existing way of thinking about building applications.
+
+
+### We will Treat the Critter Stack As a Framework
 
 The "Critter Stack" is an amalgamation of several tools and libraries. 
 
@@ -11,7 +85,9 @@ I heard someone say once (and I can't remember where, sorry!) that a **library**
 
 You can use the Marten library as a document store in any old .NET application or API project. It's a reasonable (and, IMO, some ways superior) alternative to using Entity Framework Core, or MongoDB.
 
-You can use the Wolverine library as a safer version of common .NET libraries like MediatR. 
+You can use the Wolverine library as a safer version of common .NET libraries like MediatR, or as a way to handle messages from brokers like RabbitMQ or Azure Service Bus, or Kafka.
 
 Both of these libraries are documented well ([See References](/reference/jasperfx)), and I tried to learn to use them by reading the documentation like most developers do: As a last resort. 
+
+
 

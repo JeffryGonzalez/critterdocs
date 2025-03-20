@@ -4,11 +4,23 @@ using Marten.Events;
 using Shouldly;
 
 namespace HelpDesk.Tests.Users;
+
 public record UserCreated;
+
 public record UserNameProvided(string UserName);
+
+public record UserNameChanged(string UserName);
+
 public record UserEmailProvided(string Email);
+
 public record UserPhoneProvided(string Phone);
-public enum UserContactPrefs { Phone, Email}
+
+public enum UserContactPrefs
+{
+    Phone,
+    Email
+}
+
 public record UserContactPrefsProvided(UserContactPrefs ContactPref);
 
 public record User()
@@ -18,7 +30,8 @@ public record User()
     public string Email { get; init; } = string.Empty;
     public string Phone { get; init; } = string.Empty;
     public int Version { get; init; }
-    
+    public IList<string> NameHistory { get; init; } = [];
+
     public required DateTimeOffset CreatedOn { get; init; }
     public UserContactPrefs? ContactPreference { get; init; }
 
@@ -26,12 +39,18 @@ public record User()
 
     public static User Apply(UserNameProvided userNameProvided, User user) =>
         user with { Name = userNameProvided.UserName };
+
     public static User Apply(UserEmailProvided userEmailProvided, User user) =>
         user with { Email = userEmailProvided.Email };
+
     public static User Apply(UserPhoneProvided userPhoneProvided, User user) =>
         user with { Phone = userPhoneProvided.Phone };
+
     public static User Apply(UserContactPrefsProvided userContactPrefsProvided, User user) =>
         user with { ContactPreference = userContactPrefsProvided.ContactPref };
+
+    public static User Apply(UserNameChanged userNameChanged, User user) =>
+        user with { Name = userNameChanged.UserName, NameHistory = [user.Name, ..user.NameHistory] };
 }
 
 public class Onboarding
@@ -43,17 +62,18 @@ public class Onboarding
         {
             config.Connection("host=localhost;database=issues;password=password;username=user");
         });
-        await using var session =  store.LightweightSession();
+        await using var session = store.LightweightSession();
         var created = new UserCreated();
         var nameProvided = new UserNameProvided("John Doe");
         var emailProvided = new UserEmailProvided("john@aol.com");
         var phoneProvided = new UserPhoneProvided("(555) 555-1234");
         var contactPrefsProvided = new UserContactPrefsProvided(UserContactPrefs.Email);
-        
+
         var userStreamId = Guid.NewGuid();
-        session.Events.StartStream(userStreamId, created, nameProvided, emailProvided, phoneProvided, contactPrefsProvided);
+        session.Events.StartStream(userStreamId, created, nameProvided, emailProvided, phoneProvided,
+            contactPrefsProvided);
         await session.SaveChangesAsync();
-        
+
         var user = await session.Events.AggregateStreamAsync<User>(userStreamId);
         Assert.NotNull(user);
         Assert.Equal(user.Id, user.Id);
@@ -65,9 +85,8 @@ public class Onboarding
 
         session.Events.Append(userStreamId, new UserContactPrefsProvided(UserContactPrefs.Phone));
         await session.SaveChangesAsync();
-        
-        var updatedUser = await session.Events
-            .AggregateStreamAsync<User>(userStreamId);
+
+        var updatedUser = await session.Events.AggregateStreamAsync<User>(userStreamId);
         Assert.NotNull(updatedUser);
         Assert.Equal(UserContactPrefs.Phone, updatedUser.ContactPreference);
         Assert.Equal(6, updatedUser.Version);
@@ -80,16 +99,44 @@ public class Onboarding
         {
             config.Connection("host=localhost;database=issues;password=password;username=user");
         });
-        await using var session =  store.LightweightSession();
-        
+        await using var session = store.LightweightSession();
+
         var userStreamId = Guid.NewGuid();
-        
+
         session.Events.StartStream(userStreamId, new UserCreated());
         await session.SaveChangesAsync();
         var user = await session.Events.AggregateStreamAsync<User>(userStreamId);
-        
+
         Assert.NotNull(user);
+        user.Id.ShouldBe(userStreamId);
         user.CreatedOn.ShouldBe(DateTimeOffset.Now, 1.Seconds());
-        
+    }
+
+    [Fact]
+    public async Task KeepingHistoryOfNameChanges()
+    {
+        var store = DocumentStore.For(config =>
+        {
+            config.Connection("host=localhost;database=issues;password=password;username=user");
+        });
+        await using var session = store.LightweightSession();
+
+        var userStreamId = Guid.NewGuid();
+        session.Events.StartStream(userStreamId, new UserCreated(), new UserNameProvided("Bob Smith"));
+        await session.SaveChangesAsync();
+
+        var user = await session.Events.AggregateStreamAsync<User>(userStreamId);
+        Assert.NotNull(user);
+        Assert.Equal("Bob Smith", user.Name);
+        Assert.Empty(user.NameHistory);
+
+        session.Events.Append(userStreamId, new UserNameChanged("Robert Smith"));
+        await session.SaveChangesAsync();
+
+        user = await session.Events.AggregateStreamAsync<User>(userStreamId);
+        Assert.NotNull(user);
+        Assert.Equal("Robert Smith", user.Name);
+        Assert.Single(user.NameHistory);
+        user.NameHistory.ShouldContain("Bob Smith");
     }
 }

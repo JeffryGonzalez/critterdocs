@@ -6,165 +6,70 @@ title: 'Get Started'
 
 import { Steps } from '@astrojs/starlight/components';
 
+As we begin our journey of learning how to "Think Like a Critter" using the Critter Stack, we will start with the most important thing any software does. 
+
+It does "things". It provides value, it limits liability. If you look at a successful application, like maybe Amazon.Com, you can see that all of it - every pixel, ever line of code, every database table, every network request - is all about one thing. 
+
+Getting you, the customer, to the point where we it can say "Thanks. We have more of your money now."
+
 In the world when "things happen", there is a common term that is used. An *event*. An Event is something that happens, and it is always associated with a point on a timeline. 
 
-An event is something that happens at a specific time, and it can be used to trigger other things to happen. An event can be something that happens in the real world, or it can be something that happens in the digital world. An event can be something that happens to a user, or it can be something that happens to a system. An event can be something that happens to a database, or it can be something that happens to an application. An event can be something that happens to a server, or it can be something that happens to a client. An event can be something that happens to a network, or it can be something that happens to a device.
+I think we, as software developers (and maybe I'm just projecting here), is that we tend to think of software as "stuff". Database tables, buttons, network calls, all that. And of course it *is* all that, but it is easy to lose sight of
+the fact that all of that is just a way to get to the point where we can say "Thanks. We have more of your money now." (or whatever your business is).
 
-When we build an application, we are *always* building something that responds to a fixed-set of events. An application that is running on a timer (like a CRON job), is responding to a timer event. 
-An application that is running in response to a user clicking a button is responding to a user event. 
-An application that is running in response to a network request is responding to a network event.
+## Against "Entity Centrism"
 
-For example, an HTTP API responds to HTTP Request Events. It has *nothing to do* until an event it is expecting comes knocking at the TCP door. A user interface is, on these terms, a way to provide events for our system to handle.
+A lot of software development patterns and tools emphasize the artifacts of building software. The database tables, the classes that represent that data to in our code, "services" that do things to that data. 
 
-### Events
+The term "Entity" is used a lot. 
 
-In the Critter Stack, and event is nothing really special. It's just an object created that optionally has some data attached to it to give it some details.
-
-```cs title="Sample Event"
-public record UserCreated();
-```
-
-Events are grouped together into a stream of related things. That *stream* gives some context to the event. As you will see, any of our code will have access to these events, if we need to read them, or do some processing on them. Don't think of streams as a "private world", more like a context for a group of 
-related events. Some of these you may know when you start building your system, some you will discover later on. 
-
-:::note 
-Don't get too hung up on the code examples yet, these aren't meant to be runnable code. We'll get to that soon enough
+:::tip[Definition: Entity]
+Kind of using a Domain Driven Design (DDD) term here, but an entity is a thing that has a unique identity. It is something that can be identified and tracked over time. An entity is something that has a lifecycle, and it can change over time. 
 :::
 
-<Steps>
+### The Problem With "Entities"
 
-1. User Is Created
+The problem with entity-thinking is that we have to know too much about our system before we build it. In the old days, you'd start your application by designing your database. You'd create a bunch of tables, and then you'd create a bunch of classes that represented those tables. You'd create a bunch of services that did things to those tables.
 
-    ```csharp
-    var created = new UserCreated();
-    ```
+I always thought that was a bit backwards. I mean, sure, we need to know what our data looks like, but we don't need to know everything about it before we start building our application. Not only do we not know everything about it, we can't know everything about it.
 
-2. User Sets Password
+Maybe part of this is just because historically, the database and database schema was the most inflexible part of our application, but we've moved on from that.
 
-    ```csharp
-    var passwordSet = new UserSetPassword("TacoSalad123!");
-    ```
+You might feel like the presentation of this course is a bit "fake". Maybe even what is being called now "Vibe Based Coding". That I am just making stuff up as I go along. 
 
-3. User Sets their UserName
-    
-    ```csharp
-    var userNameSet = new UserSetName("paulo");
-    ```
+But I think that is a good thing. I think it is a good thing to start with the things we know, what we need, and then build on that.
 
-</Steps>
-
-Now, these kind of things will typically happen over a span of time. But for discussions sake, let's say we are doing them all in sequence like this:
-
-```csharp
-var created = new UserCreated();
-var passwordSet = new UserSetPassword("TacoSalad123!");
-var userNameSet = new UserSetName("paulo");
-
-// create a uuid for this user to create some context for all these events.
-var userStreamId = Guid.NewGuid(); 
-
-session.Events.StartStream(userStreamId, created, passwordSet, userNameSet);
-await session.SaveChangesAsync();
-
-```
-
-These events will all be *logged* in a durable way. We have a record of everything (so far) that's happened to the user with the stream of `userStreamId`.
-
-*Conceptually*, you can imagine a log file that looks like this:
-
-| StreamId | Timestamp | Event |
-|----------|---|----|
-| 123 | 1742402102000 | User Created |
-| 123 | 1742402102001 | UserSetPassword ("TacoSalad123!")|
-| 123 | 1742402102002 | UserSet Name ("paulo") |
-
-We *could* (and we'll see how, later) query the "raw" events to see what is going on with that particular user. 
-
-That would be a bit challenging to do, but we could do it.
-
-But, we can also use these events to build a *projection* of the user. A projection is a way to take the raw events and turn them into something that is more useful for us.
-
-The Critter Stack has a built-in way to query a stream of events to derive some information - really any information - we might want about that particular user. 
-
-So let's say we just wanted to be able to ask "what is the user name for this user, and have they set their password yet?".
-
-If I were to sketch that out as a C# class, it might look something like this:
-
-```csharp
-public class UserInfoReadModel
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public bool HasSetPassword { get; set; }
-}
-```
-
-That's what I'd want to get back from looking at the stream of events for this particular user. All we have to do is give the Critter Stack a way to *project* the events into this class, and what the events (we are interested in), mean to this particular class.
+But starting your application with an *entity-centric* approach just doesn't allow for that very well. We seem to be doomed to recreating some form of the dreaded "Waterfall" over and over again.
 
 
-It's pretty simple. I want to tell it that when it sees a `UserCreated` event, it should set the `Id` property to the stream id. When it sees a `UserSetName` event, it should set the `Name` property to the name in the event. And when it sees a `UserSetPassword` event, it should set the `HasSetPassword` property to true.
+### Events and *Event-Centrism*
 
-The CritterStack prefers to let us lean into what we already know as C# developers, and does it's best to stay out of the way. 
+With event sourcing we start our thinking about the system not in terms of the "data" (entities), but in terms of what happens in our system. 
 
-So, I could say one of these `UserInfoReadModel` objects should be created whenever a `UserCreated` event is seen. For that, we can just use a plain-old C# constructor:
+An event isn't a programming thing, really. I mean everyone has an idea of what it means when you say like "Oh, I went to this cool event last weekend". It might be a little hard to get a group of people to agree on a definition of "event", but we all know what it means.
 
-```csharp
-public class UserInfoReadModel
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public bool HasSetPassword { get; set; }
+:::tip[Definition: Event]
+An event is something that happened, and it is always associated with a point on a timeline.
 
-    public UserInfoReadModel(UserCreated userCreated)
-    {
-        
-    }
-}
-```
-
-We can tell the Critter Stack to go through all the events for this particular user, and create us a `UserInfoReadModel` object. 
-
-```csharp del={"🚫": 6} ins={"✅": 3,5}  del={"🚫": 7}
-    var readModel = await session.Events.AggregateStreamAsync<UserInfoReadModel>(userStreamId);
-            
-    Assert.NotNull(readModel);
-            
-    Assert.Equal(userStreamId, readModel.Id);
-    Assert.Equal("paulo", readModel.Name);
-    Assert.True(readModel.HasSetPassword);
-```
-
-:::note
-The green ✅ indicates assertions that pass, and the red 🚫 are failures.
+It is a record of something that has already happened.
 :::
 
-But already you can see this is pretty powerful. Notice I didn't even have to *do anything*, and it automatically set the `Id` property for me. I just had to tell it what to do when it saw a `UserCreated` event, and it did the rest for me.
 
-We can use the constructor, like we've done here, to indicate that this should be an *aggregation* of all the events that come after this one (`UserCreated`).
+For example, this morning, I:
 
-We are saying, in effect, that this is the *first* event we care about, and we want to build a projection of all the events that come after it.
+- Turned off Alarm Clock
+- Got out of bed
+- Started Coffee
+- Went to the bathroom
+- Brushed my teeth
+- Got my Coffee
+- Watched the following YouTube videos:
+    - [The Critter Stack](https://www.youtube.com/watch?v=hHCEX7dxMJI&list=PLLqH9ArXIrN651Qw9cdmgMoa8PbE0rN1-&pp=0gcJCXcEOCosWNin)
+    - [Video Game Crap](https://www.youtube.com/watch?v=B5AYuNdj69M)
 
-All the *other* events for this Id should just be *applied* this object.
 
+And the list goes on and on. Those are all "events".
 
-```csharp ins={13-18}
-public class UserInfoReadModel
-{
-    public Guid Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public bool HasSetPassword { get; set; }
+That's all we mean. We will emphasize the things that happen in our system as our starting point.
 
-    
-    public UserInfoReadModel(UserCreated userCreated)
-    {
-       // This will set the "Id" for us automatically.
-    }
-    
-    public void Apply(UserSetName e)
-    {
-        Name = e.UserName;
-    }
-    
-    public void Apply(UserSetPassword _) => HasSetPassword = true;
-}
-```
+Enough - let's get started.

@@ -5,6 +5,8 @@ title: Write Some Tests
 import { Steps } from '@astrojs/starlight/components';
 import Brain from '../../../../components/Brain.astro';
 
+import { FileTree } from '@astrojs/starlight/components';
+
 Open your new solution in your IDE of choice. 
 
 
@@ -467,3 +469,14 @@ The test will fail on the ` Assert.NotNull(updatedUser);` line, but it won't thr
 
 The default, of course, is to process all the events in the stream, but you can use these options to limit the events that are processed.
 
+At the end of this section, you should have a file structure similar to this:
+
+<FileTree>
+- CritterStack
+  - docker-compose.yml
+  - HelpDeskSolution.sln
+  - HelpDesk.Tests
+    - HelpDesk.Tests.csproj
+    - Users
+      - Onboarding.cs
+</FileTree>
