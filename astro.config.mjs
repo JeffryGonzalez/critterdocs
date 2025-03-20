@@ -8,7 +8,7 @@ export default defineConfig({
     starlight({
       title: "Getting Started with Critter Stack",
       social: {
-        github: "https://github.com/withastro/starlight",
+        github: "https://github.com/JeffryGonzalez/critterdocs",
       },
       sidebar: [
 		{
