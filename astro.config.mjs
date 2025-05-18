@@ -6,33 +6,37 @@ import starlight from "@astrojs/starlight";
 export default defineConfig({
   integrations: [
     starlight({
-      title: "Getting Started with Critter Stack",
+      title: "JasperFx: Critter Stack",
       social: {
         github: "https://github.com/JeffryGonzalez/critterdocs",
       },
       sidebar: [
-		{
-			label: "Lessons",
-		
-			items: [
-				{ label: "Overview", link: "/lessons/01-overview" },
-				{ label: "Events", autogenerate: { directory: "lessons/Events" } },
-				{ label: "Messages", autogenerate: { directory: "lessons/Messages" } },
-				{ label: "APIs", autogenerate: { directory: "lessons/APIs" } },
+        {
+          label: "Tutorials",
 
+          items: [
+            { label: "Overview", link: "/tutorials/01-overview" },
+            { label: "Events", autogenerate: { directory: "tutorials/Events" } },
+            {
+              label: "Messages",
+              autogenerate: { directory: "tutorials/Messages" },
+            },
+            { label: "APIs", autogenerate: { directory: "tutorials/APIs" } },
+          ],
+        },
+        {
+          label: "How-to Guides",
+          autogenerate: { directory: "howto" },
+        },
 
-			
-			],
-		},
-		{
-			label: "How-to Guides",
-			autogenerate: { directory: "howto" },
-		},
- 
         {
           label: "Reference",
           autogenerate: { directory: "reference" },
         },
+        {
+          label: "Explanation",
+          autogenerate: { directory: "explanation" },
+        }
       ],
     }),
   ],
