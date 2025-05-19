@@ -7,9 +7,11 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "JasperFx: Critter Stack",
-      social: {
-        github: "https://github.com/JeffryGonzalez/critterdocs",
-      },
+      social: [{
+      label: "GitHub",
+      href:"https://github.com/JeffryGonzalez/critterdocs",
+        icon: "github",
+      }],
       sidebar: [
         {
           label: "Tutorials",
