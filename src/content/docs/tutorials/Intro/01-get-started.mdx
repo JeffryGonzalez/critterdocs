@@ -1,0 +1,29 @@
+---
+title: Getting Started with the Critter Stack
+description: Learn how to get started with the Critter Stack, focusing on the Happy Path to build your first Critter application.
+---
+![A Complex Airplane Cockpit](../../../../assets/767_Airplane_cockpit.jpg)
+
+The *Critter Stack* has a *lot* of moving parts. It can be a bit overwhelming at first, but don't worry, we're here to help you get started on the right path.
+
+It's easy to get lost in the complexity of the Critter Stack, but we're going to focus on the "Happy Path" first. The Happy Path is the simplest way to get started with the Critter Stack, and it will help you understand the core concepts before diving into the more complex parts.
+
+## The Happy Path
+
+Let's say you have a user-facing application that allows the user to create a list of training courses, delete them, assign instructors to them, all that stuff. It's *basically* a "todo list", but I teach software development for a living, so it is going to be a course list.
+
+The frontend is a Single Page Application (SPA) that is served up by the backend, which is a .NET API. We are implementing a simple "Backend for Frontend" pattern.
+
+The backend will handle the business logic, and the frontend will handle the user interface. 
+
+Our "business logic" will be an HTTP API that uses the Critter Stack's Wolverine Endpoints to communicate with the frontend.
+
+We will implement the following endpoints:
+- `GET /api/courses` - Get a list of courses
+- `POST /api/courses` - Create a new course
+- `DELETE /api/courses/{id}` - Delete a course
+- `POST /api/courses/{id}/instructor` - Assign an instructor to a course
+
+We will also implement a "bonus" endpoint (`GET /api/course-archive`) to show a historical list of all the courses that have been created, deleted, and instructors assigned to them as a way to explore more advanced **Projections** in the Critter Stack.
+
+In the next section, we will get you setup with a starter project if you'd like to "play along" with the code examples.
