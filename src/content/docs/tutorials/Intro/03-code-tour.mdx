@@ -21,50 +21,9 @@ There are three Nuget packages, but only two of them are really important for th
 
 <Code code={programcs} lang="csharp"  title="Program.cs"  />
 
-I'm going to pick out some of the important bits here. 
+I'm going to pick out some of the important bits here. There is some additional configuration in the `Program.cs` file for the BFF pattern, but the important parts that you would need to get started would look more like this: 
 
-```csharp
-builder.Host.UseWolverine(options =>
-{
-    options.Policies.AutoApplyTransactions();
-});
-```
-
-We use the extension on the `Host` to configure Wolverine. The `AutoApplyTransactions` policy is a convenience that will automatically apply transactions to our Wolverine endpoints. This is important because we want to make sure that our events are stored in the event store before we return a response to the client.
-
-```csharp
-builder.Services.AddMarten(config =>
-    {
-        var connectionString = builder.Configuration.GetConnectionString("db") ??
-                               throw new Exception("Connection string not found");
-        config.Connection(connectionString);
-
-    }).IntegrateWithWolverine()
-    .UseLightweightSessions();
-```
-This is where we configure Marten. We use the `AddMarten` method to configure Marten, and we use the `IntegrateWithWolverine` method to integrate Marten with Wolverine. The `UseLightweightSessions` method is a convenience that allows us to use lightweight sessions for our Marten queries.
-
-In the configuration function, we are reading a connection string from our `appsettings.Development.json` file. This is where we will connect to our PostgreSQL database running in our container.
-
-You can ignore the stuff about the reverse proxy and all that for now. That's a convenience thing for doing development on the frontend. 
-
-Notice before the call to `var app = builder.Build();` we have this line:
-
-```csharp
-builder.Services.AddWolverineHttp();
-```
-
-This will set up the services Wolverine uses to handle HTTP endpoints.
-
-These endpoints (there aren't any *yet*), will be discovered by Wolverine at the line:
-
-```csharp
-app.MapWolverineEndpoints();
-```
-
-While this `Program.cs` has some *noise*, a very minimal starting `Program.cs` might look like this:
-
-```csharp
+```csharp showLineNumbers title="Minimal Program.cs" 
 using Marten;
 using Wolverine;
 using Wolverine.Http;
@@ -95,3 +54,47 @@ app.MapWolverineEndpoints();
 app.Run();
 
 ```
+
+Let's look at the important parts of this `Program.cs` file:
+
+```csharp showLineNumbers=true startLineNumber=8
+builder.Host.UseWolverine(options =>
+{
+    options.Policies.AutoApplyTransactions();
+});
+```
+
+We use the extension on the `Host` to configure Wolverine. The `AutoApplyTransactions` policy is a convenience that will automatically apply transactions to our Wolverine endpoints. This is important because we want to make sure that our events are stored in the event store before we return a response to the client.
+
+```csharp startLineNumber=13
+builder.Services.AddMarten(config =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("db") ??
+                               throw new Exception("Connection string not found");
+        config.Connection(connectionString);
+
+    }).IntegrateWithWolverine()
+    .UseLightweightSessions();
+```
+This is where we configure Marten. We use the `AddMarten` method to configure Marten, and we use the `IntegrateWithWolverine` method to integrate Marten with Wolverine. The `UseLightweightSessions` method is a convenience that allows us to use lightweight sessions for our Marten queries.
+
+In the configuration function, we are reading a connection string from our `appsettings.Development.json` file. This is where we will connect to our PostgreSQL database running in our container.
+
+You can ignore the stuff about the reverse proxy and all that for now. That's a convenience thing for doing development on the frontend. 
+
+Notice before the call to `var app = builder.Build();` we have this line:
+
+```csharp startLineNumber=22
+builder.Services.AddWolverineHttp();
+```
+
+This will set up the services Wolverine uses to handle HTTP endpoints.
+
+These endpoints (there aren't any *yet*), will be discovered by Wolverine at the line:
+
+```csharp startLineNumber=26
+app.MapWolverineEndpoints();
+```
+
+While this `Program.cs` has some *noise*, a very minimal starting `Program.cs` might look like this:
+
