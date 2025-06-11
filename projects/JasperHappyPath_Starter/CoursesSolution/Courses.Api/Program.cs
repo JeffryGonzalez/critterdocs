@@ -10,15 +10,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(o =>
 {
-
-    o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-    
+    o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;   
 });
 builder.Host.UseWolverine(options =>
 {
     options.Policies.AutoApplyTransactions();
 });
-builder.Services.AddDirectoryBrowser();
+
 builder.Services.AddMarten(config =>
     {
         var connectionString = builder.Configuration.GetConnectionString("db") ??
@@ -33,8 +31,6 @@ builder.Services.AddWolverineHttp();
 builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 var app = builder.Build();
 
-
-
 if (app.Environment.EnvironmentName == "Frontend")
 {
     app.MapReverseProxy();
@@ -42,14 +38,11 @@ if (app.Environment.EnvironmentName == "Frontend")
 else
 {
     app.UseDefaultFiles();
-
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.WebRootPath, "app")),
         RequestPath = "/app"
     });
 }
-
 app.MapWolverineEndpoints();
-
 app.Run();

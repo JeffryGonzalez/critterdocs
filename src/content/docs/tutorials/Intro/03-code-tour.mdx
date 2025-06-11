@@ -1,0 +1,97 @@
+---
+title: Tour of the Code
+---
+import csproj from '../../../../../projects/JasperHappyPath_Starter/CoursesSolution/Courses.Api/Courses.Api.csproj?raw'
+import programcs from '../../../../../projects/JasperHappyPath_Starter/CoursesSolution/Courses.Api/Program.cs?raw'
+import { Code } from '@astrojs/starlight/components';
+export const nugetHighlight = [`WolverineFx.Http`, `WolverineFx.Http.Marten`];
+
+To save you time, I created a starter project. It's just using the "empty" Web API template, and has a few Nuget packages installed, and a bit of configuration in the `Program.cs` file.
+
+Here is the `.csproj` file for the API project:
+
+
+
+<Code code={csproj} lang="xml"   title="Courses.Api.csproj" mark={nugetHighlight} frame='code'  />
+
+There are three Nuget packages, but only two of them are really important for this course:
+
+- `WolverineFx.Http` - This is the Wolverine package that allows us to create HTTP endpoints.
+- `WolverineFx.Http.Marten` - This is the package that allows us to integrate our Wolverine endpoints with Marten, which is our event store.
+
+<Code code={programcs} lang="csharp"  title="Program.cs"  />
+
+I'm going to pick out some of the important bits here. 
+
+```csharp
+builder.Host.UseWolverine(options =>
+{
+    options.Policies.AutoApplyTransactions();
+});
+```
+
+We use the extension on the `Host` to configure Wolverine. The `AutoApplyTransactions` policy is a convenience that will automatically apply transactions to our Wolverine endpoints. This is important because we want to make sure that our events are stored in the event store before we return a response to the client.
+
+```csharp
+builder.Services.AddMarten(config =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("db") ??
+                               throw new Exception("Connection string not found");
+        config.Connection(connectionString);
+
+    }).IntegrateWithWolverine()
+    .UseLightweightSessions();
+```
+This is where we configure Marten. We use the `AddMarten` method to configure Marten, and we use the `IntegrateWithWolverine` method to integrate Marten with Wolverine. The `UseLightweightSessions` method is a convenience that allows us to use lightweight sessions for our Marten queries.
+
+In the configuration function, we are reading a connection string from our `appsettings.Development.json` file. This is where we will connect to our PostgreSQL database running in our container.
+
+You can ignore the stuff about the reverse proxy and all that for now. That's a convenience thing for doing development on the frontend. 
+
+Notice before the call to `var app = builder.Build();` we have this line:
+
+```csharp
+builder.Services.AddWolverineHttp();
+```
+
+This will set up the services Wolverine uses to handle HTTP endpoints.
+
+These endpoints (there aren't any *yet*), will be discovered by Wolverine at the line:
+
+```csharp
+app.MapWolverineEndpoints();
+```
+
+While this `Program.cs` has some *noise*, a very minimal starting `Program.cs` might look like this:
+
+```csharp
+using Marten;
+using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseWolverine(options =>
+{
+    options.Policies.AutoApplyTransactions();
+});
+
+builder.Services.AddMarten(config =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("db") ??
+                               throw new Exception("Connection string not found");
+        config.Connection(connectionString);
+
+    }).IntegrateWithWolverine()
+    .UseLightweightSessions();
+
+builder.Services.AddWolverineHttp();
+
+var app = builder.Build();
+
+app.MapWolverineEndpoints();
+
+app.Run();
+
+```

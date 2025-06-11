@@ -11,3 +11,25 @@ You will need a few things to get started here:
 - Git
 - A fairly recent version of Node.js (Version 18 or later) and NPM (Just to get started, but you can also dip into the frontend later, if you are interested)
 
+## Getting the Starter Code
+
+Find (or create) a nice clean directory to work in, and then run the following command to clone the starter code for this course:
+
+```bash
+npx gitpick JeffryGonzalez/critterdocs/tree/main/projects/JasperHappyPath_starter
+```
+This will create a new directory called `JasperHappyPath_starter` in your current directory, and it will copy the starter code into that directory.
+
+Make sure your container runtime is running, and then run the following command to start the Critter Stack:
+
+```bash
+cd JasperHappyPath_starter
+docker compose up -d
+```
+
+In the `JasperHappyPath_starter` directory, `CoursesSolution/CoursesSolution.sln` file. Open that in your editor and run the application.
+
+After the application starts, your browser should open to `https://localhost:7203/app/` and you should see our frontend. 
+
+If you click on the "Courses" link in the header, the application will *attempt* to load a list of courses from our API, but it will fail because we haven't implemented the API yet.
+
