@@ -18,15 +18,10 @@ export default defineConfig({
           label: "Tutorials",
 
           items: [
-            { label: "Overview", link: "/tutorials/01-overview" },
+            { label: "Overview", link: "/tutorials/" },
             { label:"Getting Started", autogenerate: { directory: "tutorials/Intro" } },
            
-            { label: "Events", autogenerate: { directory: "tutorials/Events" } },
-            {
-              label: "Messages",
-              autogenerate: { directory: "tutorials/Messages" },
-            },
-            { label: "APIs", autogenerate: { directory: "tutorials/APIs" } },
+           
           ],
         },
         {

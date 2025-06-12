@@ -1,0 +1,354 @@
+---
+title: Adding and Retrieving A Course
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+If you open the web page served by our application, and go to the courses page, you will see an error. It is calling our non-existent API endpoint, and it is failing with a 404 Not Found error. 
+
+We need a way to get a list of courses to display here. A bit of a chicken and egg problem, but we can solve it by implementing the `GET /api/courses` endpoint, *after* we create a way to add a course.
+
+We will start by implementing the `POST /api/courses` endpoint, which will allow us to create a new course, and then we will implement the `GET /api/courses/{id}` endpoint to retrieve the course we just created.
+
+In our next section, Projections, we will look at a way to implement the logic to get a full list of courses using Marten Projections, but for now, we will just implement the basic functionality to add and retrieve a course.
+
+## Video Walkthrough
+Here is a video walkthrough of this section, where I will show you how to implement the `POST /api/courses` and `GET /api/courses/{id}` endpoints. You can follow along with the code examples below, or just watch the video to see how it all works.
+
+The video walkthrough has some more details than I'll show below, so I recommend watching it if you want to see alternatives and hear some rationale.
+
+<div style="padding:56.25% 0 0 0;position:relative;"><iframe src="https://player.vimeo.com/video/1092755931?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="JasperFx Getting Started - 1 - Create and Get Courses"></iframe></div><script src="https://player.vimeo.com/api/player.js"></script>
+
+## Adding a Course
+
+First, file and project organization is up to you. I have a tendency to be a little "messy" with my code organization while figuring things out, so I put tons of stuff in the same file, and try to remember to organize it a bit more before I commit it to the repository. 
+
+Let's start by creating a new file called `Courses/Api.cs` in the `Courses.Api` project. This file will contain our API endpoints for the courses.
+
+I'm going to implement this as a static class with my endpoints, but you can also implement this as a regular class if you prefer, and you can even do a lot of this with so-called "Minimal APIs" if you want to.
+
+Assuming you've created .NET APIs before, you are no-doubt familiar with the the various attributes that you can use to define your endpoints, like `[HttpGet]`, `[HttpPost]`, etc. Wolverine has its own set of attributes that you can use to define your endpoints, and they are very similar to the ones you are used to, however
+they add considerable "super powers" when you are implementing your backend with the "Critter Stack", especially when it comes to working with Marten and the event store.
+
+### Short Explanation of the Approach
+
+The Critter Stack is *opinionated*, but also extremely flexible. You can pick and choose the pieces you want to use, and you can implement your own custom logic if you need to. Where it really shines, however, is when you "buy in", so to speak, to the conventions and patterns associated with Event Sourcing.
+
+**Event Sourcing**, briefly, is a way of storing the state of an application as a series of events that have occurred over time. Instead of storing the current state of an object, you store the events that have led to that state. This allows you to reconstruct the state of an object at any point in time, and it also allows you to "replay" events to change the state of an object.
+
+This is very different than how I was "brought up" as a software developer. I remember being taught that the *first thing* you do when building an application is to create a database schema, and then you build your application around that schema. I remember being taught that approach in school and thought I got pretty good at it.
+
+Then I got into the "real world". The approach of "database first, schema first" is a recipe for disaster. I found it means that basically you have to design the entire application up front, before you even start writing any code. In simple, proven, cases, this might work. As a matter of fact, for the application we are building
+here we could get away with that approach, but as you'll see as the course goes on, the Critter Stack allows you to build your application in a more flexible way that is much more resilient to change.
+
+And the "real world" (for me, anyhow) is all about change. We almost never know what is coming down the pike, and we have to be able to adapt quickly. The Critter Stack is designed to help you do just that.
+
+When implementing event sourcing, I think of it like a good police procedural drama. You impartially "take notes" of what has happened, and *then* derive meaning from those notes. These "notes" are the events we record. Events are a record of something that has happened in the past, and they are immutable. 
+
+At the end of this tutorial we will be able to make the application "work". We will be able to add courses, delete them, assign instructors. We could store all of that in a relational database with a "courses" table, or a document database (Marten does documents better than about any other database out there), but we will be able to do it in a way that is flexible and resilient to change.
+For example, what if the next requirement to show up is they need a management report that lists out some statistics about how many courses were created each month, or how many instructors were assigned to courses? Sure, using a relational database we could do that, but it would take a lot of work to get there, changing the schema, writing queries, etc. And even with that, we'd probably only be able to say "we can start offering you that data *next month*" as we start to record the data in a way that we can query it later.
+
+With event sourcing, we can just decide to interpret our notes in a different way. We have a record of *everything* that has happened, and we can derive meaning from that at any time. We can even change the way we interpret those notes later, without having to change the underlying data.
+
+#### Some Definitions
+
+We are going to gradually introduce some terminology that is important to understand when working with the Critter Stack and Event Sourcing:
+
+- **Event**: An event is a record of something that has happened in the past. It is immutable and cannot be changed.
+- **Projection**: A projection is a way of interpreting events to derive meaning from them. It is a *read model* that is built from the events.
+
+
+### Implementing the `POST /api/courses` Endpoint
+
+We will start by creating a couple of "Models" that we will use to represent the data we want to send and receive from our API, and what we will return. I'm going to use C# records for this, but you can use classes if you prefer. Nothing special here.
+
+```csharp showLineNumbers title="Courses/Api.cs"
+public record CreateCourseRequest(
+    string Title,
+    string Description,
+    int NumberOfDays
+    );
+
+public record CreateCourseResponse(
+    Guid Id, 
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+```
+
+So, when they do a `POST /api/courses` request, they will send us a `CreateCourseRequest` object, and we will return a `CreateCourseResponse` object. In an HTTP file, it might look like this:
+
+```http
+POST /api/courses HTTP/1.1
+Content-Type: application/json
+
+{
+  "title": "Introduction to C#",
+  "description": "Learn the basics of C# programming language.",
+  "numberOfDays": 5
+}
+```
+
+And we want them to get a response like this:
+
+```http
+HTTP/1.1 201 Created
+Location: /api/courses/d3b8f5c2-4f1e-4b2a-9c3e-6f1e4b2a9c3e
+
+{
+  "id": "d3b8f5c2-4f1e-4b2a-9c3e-6f1e4b2a9c3e",
+  "title": "Introduction to C#",
+  "description": "Learn the basics of C# programming language.",
+  "numberOfDays": 5
+}
+```
+
+In later tutorials, we will introduce validation (Wolverine has some great validation features based on the `FluentValidation` library), but for now, we will just assume that the request is valid.
+
+Next, we'll define our Event. This is the event that will be stored in the event store when a course is created. We will use this event to create a projection.
+
+```csharp showLineNumbers title="Courses/Api.cs"
+ public record CourseCreated(
+    string Title,
+    string Description,
+    int NumberOfDays
+    );
+```
+Again, I'm using a C# record here, but you can use a class if you prefer. The important thing is that this event contains the data we need to create a course.
+
+A couple subtle things to note here:
+- The event is named `CourseCreated`, which follows the convention of naming events in the past tense. We are stating a fact: a course was created.
+- The event contains the data we need to create a course, but it does not contain an `Id` property. We will let Marten generate the `Id` for us when we store the event in the event store. 
+    - A course is an important "thing" in our application. It will have a life. It will be created, modified, references in other events. Important "things" in our application, when using event sourcing, are called a "**Stream**". We will have a lot of courses, and the idea of a stream is having a way to track all the events that have happened to a course over time to a particular course.
+
+There are many ways to implement this, but this is my *default* way of doing it. It can be a little confusing the first time you see it, but once you get used to it, it is a very powerful way to think about your applications.
+
+#### Define the "Read Model" Projection.
+
+We are going to create a class (here, a record, but you can use a class if you prefer) that will represent the course in our application. This is the "read model" projection that we will use to retrieve the course later. 
+An important thing to keep in mind is that unlike traditional relational databases, this is just a "guess" at what the idea of a Course will look like in *this context*. We can change it later, and we can even have multiple projections for the same stream of events. As a matter of fact, we will end this tutorial be creating a whole other "lens" through which we can interpret events related to a course. But *we are not defining a schema* here. We are defining a "view" through which we can interpret the events that will happen to a course.
+
+And that's going to be pretty easy for now, because we only have one event (`CourseCreated`) that we will use to create the course. 
+
+
+```csharp showLineNumbers title="Courses/Api.cs"
+public record Course(
+    public Guid Id { get; set; }
+    public int Version { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int NumberOfDays { get; set; }
+)
+``` 
+
+This is a simple record that contains the properties we need to represent a course. The `Id` property is the unique identifier for the course, and the `Version` property is used to keep track of the version of the course. The `Title`, `Description`, and `NumberOfDays` properties are used to represent the course data.
+
+The `Id` property is going to be the identifier for the course, but as well-trained event sourcing developers, this will also be the identifier for the stream of events that we will use to track the course over time.
+
+The `Version` property is used to keep track of the version of the course. This is important because we will be using Marten's optimistic concurrency control to ensure that we don't accidentally overwrite changes made by other users. We'll explore this in later tutorials, and it is optional, but it is a good practice to follow. **Spoiler**: Having a Version property will allow us, later, to do "time travel" with our projections. We can say things like "What did this course look like way back at Version 1, when it was first created?". We can even do time-based projections, like "What did this course look like at the end of last month?".
+
+But this is just a simple class (record). We need to add a bit of code to it to tell Marten how to deal with the events during the "life" of a course. Right now we only have the one event (`CourseCreated`), so we will just implement a method that will handle that event and create the course.
+
+Marten uses a convention-based approach to handle events. It looks for methods that start with `Create` or `Apply`, etc., and it will use those methods to create or apply the event to the projection. We will use the `Create` method to create the course from the `CourseCreated` event, and this will be the first time we see Marten's "conventions" in action.
+
+Modify the `Course` record to look like this:
+
+
+```csharp showLineNumbers title="Courses/Api.cs" ins={8-14}
+public record Course(
+    public Guid Id { get; set; }
+    public int Version { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int NumberOfDays { get; set; }
+
+    public static Course Create(CourseCreated courseCreated) => 
+        new Course 
+        { 
+            Title = courseCreated.Title, 
+            Description = courseCreated.Description, 
+            NumberOfDays = courseCreated.NumberOfDays 
+        };
+)
+``` 
+
+<Aside type="note">Notice we aren't implementing any interfaces we don't own, we aren't inheriting from any base classes, and we aren't using any attributes. This is just a simple record that Marten will use to create the course from the `CourseCreated` event.</Aside>
+
+#### Implementing the `POST /api/courses` Endpoint
+
+Now we can bring it all together. We need an endpoint that the client can:
+
+1. `POST /api/courses` with a `CreateCourseRequest` object
+2. The endpoint will create a `CourseCreated` event from the request
+3. The endpoint will store the `CourseCreated` event in the event store
+4. The endpoint will return a `CreateCourseResponse` object with the course data
+
+<Aside type="tip">In the video walkthrough I show a more *verbose* way to accomplish this which may help you understand this better if you are a little confused.</Aside>
+
+In the `Courses/Api.cs` file, make the `Api` class a static class, and then add the following code:
+    
+```csharp showLineNumbers title="Courses/Api.cs" ins={3-17} mark="static class"
+public static class Api 
+{
+    [WolverinePost("/api/courses")]
+    public static (Created<CreateCourseResponse>, IStartStream) Post(CreateCourseRequest request)
+    {
+
+        var op = MartenOps.StartStream<Course>(new CourseCreated(request.Title, request.Description,
+            request.NumberOfDays));
+        var response = new CreateCourseResponse(
+            Id: op.StreamId,
+            Title: request.Title,
+            Description: request.Description,
+            NumberOfDays: request.NumberOfDays
+        );
+        var responseMessage = TypedResults.Created($"/api/courses/{response.Id}", response);
+        return (responseMessage, op);
+    }
+}
+```
+
+<Aside type="note">I am leaving out the `using` statements for brevity. A complete code listing will be provided at the end of this page</Aside>
+
+Some notes:
+- We are using the `WolverinePost` attribute to define the endpoint. This is similar to the `[HttpPost]` attribute you are used to, but it has some additional features that make it easier to work with Marten and the event store.
+- We are return a tuple with a `Created<CreateCourseResponse>` and an `IStartStream`. The `Created<CreateCourseResponse>` is the response that will be returned to the client, and the `IStartStream` is used to start a new stream in the event store.
+- The `MartenOps.StartStream<Course>(...)` method is used to start a new stream in the event store. It takes the `CourseCreated` event as a parameter, and it will create a new stream with the `Course` projection. It will generate a new Stream Id for us, which we can use to return the course data to the client.
+
+*Notice* this is not an `async` method. We are not doing any asynchronous work here, so we don't need to make it an `async` method. This is a synchronous endpoint that will return a response immediately. As you'll see in the future when we get to testing, this is a "pure function", with no side effects. In reality it is an `async` operation, but Wolverine will handle that for us under the hood. Later we will look at how that happens. 
+
+In the tuple we return, the "rule" is that the first item is the response to the client, and the second item is the operation that will be performed on the event store. (Or it could be a Command for a Wolverine Handler to deal with, we'll do that later in a tutorial). 
+
+If you were explaining this a code review with a reviewer that said "explain this to me like I'm five", you could say something like:
+
+> This endpoint takes a request to create a course, creates an event that represents that course being created, and then stores that event in the event store. It returns a response to the client with the course data and a location where the course can be retrieved later.
+
+<Aside type="note">If you take a look at the database (you can see this in the video walkthrough), you will see that Marten created two tables for us: `mt_streams` and `mt_events`. The `mt_streams` table is used to store the streams, and the `mt_events` table is used to store the events. The `mt_streams` table has a row for each stream, and the `mt_events` table has a row for each event in the streams. In other words, this is *persisted* as a transaction. We had zero *imperative* database code here at all. It's handled for us.</Aside>
+
+### Implementing the `GET /api/courses/{id}` Endpoint
+
+Now that we have the ability to create a course, we need to implement the ability to retrieve a course. We will implement the `GET /api/courses/{id}` endpoint, which will allow us to retrieve a course by its `Id`.
+
+That `{id}` is the identifier for the course, but we know it is the Stream Id which is a way of saying "create me a representation (projection) of a `Course` based on *all the event* that have occurred in the past for this stream".
+
+In other words, we need to query the `mt_events` table for all the events related to that stream id, and for each one, consider it in order, and apply it to the `Course` projection.
+
+Of course, if there is no stream with that Id, since we are using HTTP, we should return a `404 Not Found` response.
+
+You *could* do that if you got paid by the hour or something. I'll admit the first 50 times or so I wrote that kind of code I felt pretty clever, but if I don't have to write that monotonous junk again I'm happy.  
+
+All we need to add to our `Api` class is the following code:
+
+```csharp showLineNumbers title="Courses/Api.cs" ins={20-21}
+public static class Api 
+{
+    [WolverinePost("/api/courses")] 
+    public static (Created<CreateCourseResponse>, IStartStream) Post(CreateCourseRequest request)
+    {
+
+        var op = MartenOps.StartStream<Course>(new CourseCreated(request.Title, request.Description,
+            request.NumberOfDays));
+        var response = new CreateCourseResponse(
+            Id: op.StreamId,
+            Title: request.Title,
+            Description: request.Description,
+            NumberOfDays: request.NumberOfDays
+        );
+        var responseMessage = TypedResults.Created($"/api/courses/{response.Id}", response);
+        return (responseMessage, op);
+    }
+
+
+    [WolverineGet("/api/courses/{id:guid}")]
+    public static Course Get([ReadAggregate] Course course) => course;
+}
+
+```
+
+Pretty cool, right? No service to inject, no database to query, no SQL (or LINQ) to write, no ORM to configure. Just a simple method that takes a `Course` projection as a parameter, and returns it.
+
+The `[ReadAggregate]` attribute tells Wolverine to read the `Course` projection from the event store using the Stream Id provided in the URL. It will automatically apply all the events related to that stream to the `Course` projection, and return it to us.
+And if there is no stream with that Id, it will return a `404 Not Found` response automatically.
+
+
+### Final Code For The `Courses/Api.cs` File At This Point:
+
+```csharp showLineNumbers title="Courses/Api.cs"
+using Marten;
+using Marten.Events.Aggregation;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Wolverine.Http;
+using Wolverine.Http.Marten;
+using Wolverine.Marten;
+
+namespace Courses.Api.Courses;
+
+public record CreateCourseRequest(
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+public record CreateCourseResponse(
+    Guid Id, 
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+// Events 
+
+public record CourseCreated(
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+// Read Models
+
+public record Course
+{
+    public Guid Id { get; set; }
+    public int Version { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int NumberOfDays { get; set; }
+
+     public static Course Create(CourseCreated evt)
+    {
+        return new Course
+        {
+            Title = evt.Title,
+            Description = evt.Description,
+            NumberOfDays = evt.NumberOfDays
+        };
+    }
+    
+}
+
+
+public static class Api
+{
+
+    [WolverinePost("/api/courses")]
+    public static (Created<CreateCourseResponse>, IStartStream) Post(CreateCourseRequest request)
+    {
+
+        var op = MartenOps.StartStream<Course>(new CourseCreated(request.Title, request.Description,
+            request.NumberOfDays));
+        var response = new CreateCourseResponse(
+            Id: op.StreamId,
+            Title: request.Title,
+            Description: request.Description,
+            NumberOfDays: request.NumberOfDays
+        );
+        var responseMessage = TypedResults.Created($"/api/courses/{response.Id}", response);
+        return (responseMessage, op);
+    }
+
+    [WolverineGet("/api/courses/{id:guid}")]
+    public static Course Get([ReadAggregate] Course course) => course;
+
+}
+```

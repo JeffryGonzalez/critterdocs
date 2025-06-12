@@ -1,0 +1,30 @@
+### Add a Course
+
+POST https://localhost:7203/api/courses
+Content-Type: application/json
+
+{
+  "title": "Async Daemon in Wolverine/Marten",
+  "description": "Learn the basics of programming using Python.",
+  "numberOfDays": 3
+}
+
+
+### Get a Course
+
+GET https://localhost:7203/api/courses/01975af8-fbd3-4135-83c5-60753e9f8350
+
+
+### Get Courses
+
+GET https://localhost:7203/api/courses
+
+
+### Delete A Course
+
+DELETE https://localhost:7203/api/courses/01975b00-f65e-43e2-af78-d2410265e849
+
+
+### Get Course history
+
+GET https://localhost:7203/api/course-archive

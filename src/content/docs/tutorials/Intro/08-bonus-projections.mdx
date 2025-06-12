@@ -1,0 +1,210 @@
+---
+title: Create a New Projection
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import { Card } from '@astrojs/starlight/components';
+
+<Card title="Bonus Content">
+To really help the idea of projections "sink in", I wanted to show you another example of a projection. This one will be a little more complex, but it will be a good way to "whet your appetite" for more, and, frankly, possibly address your anxiety about deleting projections. I know that is one thing that freaked me out when I was first getting started.
+</Card>
+
+## Narrative
+
+Let's say that we want another endpoint that shows us *all* the courses that have ever been created, deleted, and a history of all the instructor assignments. This won't be exposed to our frontend, but will be accessible, perhaps, by doing a `GET /api/course-archive` request. This will be a "historical" view of all the courses that have ever been created, deleted, and instructors assigned to them.
+
+We could also add a `GET /api/course-archive/{id}` endpoint to get the history of a specific course, but for now, let's just focus on the "all courses" view. You could add that later as a practice if you'd like.
+
+## Adding a Projection and Endpoint
+
+Let's create a new source code file in the `Courses` directory in our project called `CourseArchive.cs`. We'll define our read model as a record in that file like this:
+
+```csharp title="CourseArchive.cs"
+public record CourseHistory
+{
+    public Guid Id { get; set; }
+    public int Version { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int NumberOfDays { get; set; }
+    public InstructorAssignment? CurrentInstructor { get; set; }
+    public InstructorAssignment[] PreviousInstructors { get; set; } = [];
+    public DateTimeOffset DateCreated { get; set; }
+    public DateTimeOffset? DateDeleted { get; set; } = null;
+   
+}
+public record InstructorAssignment(string Instructor, DateTimeOffset DateAssigned);
+```
+
+We'll create after that a new `SingleStreamProjection` for this read model:
+
+```csharp title="CourseArchive.cs"
+public class CourseHistoryProjection : SingleStreamProjection<CourseHistory, Guid>
+{
+    public static CourseHistory Create(IEvent<CourseCreated> evt)
+    {
+        return new CourseHistory
+        {
+            Title = evt.Data.Title,
+            Description = evt.Data.Description,
+            NumberOfDays = evt.Data.NumberOfDays,
+            DateCreated = evt.Timestamp,
+            DateDeleted = null
+        };
+    }
+    public static CourseHistory Apply(IEvent<CourseDeleted> evt, CourseHistory course) => course with { DateDeleted = evt.Timestamp  };
+
+    public static CourseHistory Apply(IEvent<InstructorAssignedToCourse> evt, CourseHistory course)
+    {
+
+        var oldInstructor = course.CurrentInstructor;
+        var previousInstructors = course.PreviousInstructors.ToList();
+        if (oldInstructor is not null)
+        {
+            previousInstructors = [oldInstructor, ..previousInstructors];
+        }
+        return course with
+        {
+            CurrentInstructor = new InstructorAssignment(evt.Data.Instructor, evt.Timestamp),
+            PreviousInstructors = previousInstructors.ToArray()
+        };
+        
+    }
+   
+}
+```
+
+Some notes about this:
+
+- Notice that in the handlers (`Create`, `Apply`) instead of just taking the raw event, we are taking an `IEvent<T>` where `T` is the event type. This gives us access to the event's metadata, like the timestamp.
+- We have our same `Create` method that initializes the `CourseHistory` record with the data from the `CourseCreated` event.
+    - Here we are using the `evt.Timestamp` to set the `DateCreated` property.
+- Instead of using `ShouldDelete` for the `CourseDeleted` event, we are using an `Apply` method that sets the `DateDeleted` property to the timestamp of the event. This way, we can keep track of when the course was deleted, but not actually removing it from the database.
+- The `Apply` method for the `InstructorAssignedToCourse` event updates the `CurrentInstructor` property and adds the previous instructor to the `PreviousInstructors` array. This way, we can keep track of all the instructors that have been assigned to the course, and the date and time they were assigned.
+
+We can now add an endpoint to get all the courses in the archive:
+
+```csharp title="CourseArchive.cs"
+public static class CourseArchive
+{
+    [WolverineGet("/api/course-archive")]
+    public static async Task<Ok<IReadOnlyList<CourseHistory>>> Get(IDocumentSession session)
+    {
+        var response = await session.Query<CourseHistory>().ToListAsync();
+        return TypedResults.Ok(response);
+    }
+}
+```
+
+Since we are using the `IDocumentSession` to query the `CourseHistory` records, we can just return the results as an `IReadOnlyList<CourseHistory>`. This will give us a list of all the courses that have ever been created, deleted, and instructors assigned to them. But we will have to tell Marten again about the existence of this projection so that the `mt_coursehistory` table is materialized. We'll again use a `Live` projection, but since this is *statistical*, it's a good use case for an `Async` projection.  We'll stick with the `Live` projection for now, but you can change it to `Async` if you want to explore that later.
+
+Here's an *abbreviated* version of the `Program.cs` file that includes the new projection, with the additions highlighted (note: just add the new stuff to your existing `Program.cs` file):
+
+```diff lang="csharp"
+using System.Text.Json.Serialization;
+using Courses.Api.Courses;
+using JasperFx.Events.Projections;
+using Marten;
+using Microsoft.Extensions.FileProviders;
+using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
+
+var builder = WebApplication.CreateBuilder(args);
+
++builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(o =>
++{
++   o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;   
++ });
+builder.Host.UseWolverine(options =>
+{
+    options.Policies.AutoApplyTransactions();
+});
+builder.Services.AddDirectoryBrowser();
+builder.Services.AddMarten(config =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("db") ??
+                               throw new Exception("Connection string not found");
+        config.Connection(connectionString);
+
+        config.Projections.Add<CourseProjection>(ProjectionLifecycle.Inline);
++        config.Projections.Add<CourseHistoryProjection>(ProjectionLifecycle.Inline);
+    }).IntegrateWithWolverine()
+    .UseLightweightSessions();
+
+builder.Services.AddWolverineHttp();
+
+app.MapWolverineEndpoints();
+
+app.Run();
+``` 
+
+Some notes:
+
+The `builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi` line is optional, but it sets the default JSON serialization options for Wolverine and the Minimal API to ignore null values. This is a good practice to reduce the size of the JSON payloads, and also means that when we serialize this to the client, it won't include the `DateDeleted` property if it is null, which is the case for courses that have not been deleted yet.
+
+We add the projection for `CourseHistoryProjection` in the same way we did for `CourseProjection`, but we use `ProjectionLifecycle.Inline` to indicate that this is a live projection that will be updated in real-time as events are appended to the stream.
+
+If you make a `GET https://localhost:7203/api/course-archive` request after adding a few courses, assigning some instructors, and perhaps deleting a course or two, you should see a response like this:
+
+```json 
+[
+  {
+    "id": "019764b9-2f64-41c7-8728-cd8c086b76a7",
+    "version": 2,
+    "title": "Event Sourcing 101",
+    "description": "Learn the basics of Event Sourcing with the Critter Stack from JasperFx",
+    "numberOfDays": 3,
+    "currentInstructor": {
+      "instructor": "Jeffry Gonzalez",
+      "dateAssigned": "2025-06-12T15:20:38.109297+00:00"
+    },
+    "previousInstructors": [],
+    "dateCreated": "2025-06-12T15:19:07.517769+00:00"
+  },
+  {
+    "id": "019764b9-9968-454b-a7b2-eaf8c9ac43d4",
+    "version": 3,
+    "title": "Advanced Projections with the Critter Stack",
+    "description": "Go deeper into designing and optimizing projections with the Critter Stack.",
+    "numberOfDays": 2,
+    "currentInstructor": {
+      "instructor": "Jeremy Miller",
+      "dateAssigned": "2025-06-12T15:21:28.166612+00:00"
+    },
+    "previousInstructors": [
+      {
+        "instructor": "Jeffry Gonzalez",
+        "dateAssigned": "2025-06-12T15:20:53.484316+00:00"
+      }
+    ],
+    "dateCreated": "2025-06-12T15:19:34.512668+00:00"
+  },
+  {
+    "id": "019764ba-6183-4010-ae96-d698ca6ab341",
+    "version": 3,
+    "title": "Building a \"CRUD\" Application with Entity Framework and .NET",
+    "description": "Build a \"CRUD\" application with .NET and Microsoft's Entity Framework.",
+    "numberOfDays": 8,
+    "currentInstructor": {
+      "instructor": "Jeremy Miller",
+      "dateAssigned": "2025-06-12T15:21:10.082672+00:00"
+    },
+    "previousInstructors": [],
+    "dateCreated": "2025-06-12T15:20:25.736366+00:00",
+    "dateDeleted": "2025-06-12T15:22:12.698171+00:00"
+  }
+]
+```
+
+For example, you can see exactly when each course was created, and, if deleted, when it was deleted. You can see that `Jeffry Gonzalez` is the instructor for the `Event Sourcing 101` course, and that `Jeremy Miller` is the current instructor for the `Advanced Projections with the Critter Stack` course, replacing Jeff Gonzalez when he chickened out. Jeremy was also the instructor `Building a "CRUD" Application with Entity Framework and .NET` course before it was deleted.
+
+
+<Card title="The Final Code">
+Reminder: you can pull down my final code for this project by creating a new directory and running the following command:
+
+```bash
+npx gitpick JeffryGonzalez/critterdocs/tree/main/projects/JasperHappyPath_Final
+```
+Make sure you start the container!
+</Card>

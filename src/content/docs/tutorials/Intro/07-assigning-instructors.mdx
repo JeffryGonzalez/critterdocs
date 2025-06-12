@@ -1,0 +1,73 @@
+---
+title: Assigning Instructors
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The last little bit to make our app functional is to have the ability to assign an instructor to the course.
+
+## Video Walkthrough
+
+## Appending and Applying Events to the Stream 
+
+Hopefully you have a sense of what we are going to do here. We aren't going to have to change our database schema, do an "update" statement, etc. We will just append an event to the stream, and tell Marten how that event applies to the `Course` projection.
+
+Let's start with adding an event:
+
+```csharp title="Api.cs"
+public record AssignInstructorToCourse(string Instructor);
+```
+
+We'll create an HTTP endpoint to append this event to the stream:
+
+```csharp title="Api.cs"
+[WolverinePost("/api/courses/{id:guid}/instructor"), EmptyResponse]
+public static InstructorAssignedToCourse AssignInstructor(
+    [Aggregate] Course course, AssignInstructorToCourse req) => 
+        new InstructorAssignedToCourse(req.Instructor);
+```
+
+You can see this is very similar to the `DELETE` endpoint we created earlier. The `AssignInstructor` method appends the `InstructorAssignedToCourse` event to the stream identified by the `Course` aggregate. If that Course doesn't exist, it'll return a 404. 
+
+## Updating the Projection
+Now we need to update our projection to handle this new event and add a property to our `Course` record to hold the instructor.
+
+```csharp title="CourseProjection.cs" ins={9, 26-27}
+public record Course
+{
+    public Guid Id { get; set; }
+    public int Version { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int NumberOfDays { get; set; }
+
+    public string Instructor { get; set; } = string.Empty;    
+}
+
+public class CourseProjection : SingleStreamProjection<Course, Guid>
+{
+    public static Course Create(CourseCreated evt)
+    {
+        return new Course
+        {
+            Title = evt.Title,
+            Description = evt.Description,
+            NumberOfDays = evt.NumberOfDays
+        };
+    }
+
+   public bool ShouldDelete(CourseDeleted evt) => true;
+   
+   public static Course Apply(InstructorAssignedToCourse evt, Course course) 
+        => course with { Instructor = evt.Instructor };
+}
+```
+
+And that is *it*. We are done! The frontend should be pretty functional at this point. 
+
+Hopefully we did enough here that you:
+
+a. Have a "feel" for how the Critter Stack works
+b. Can begin to see that this gets a little *redundant* (at least for the easy cases). That's a good thing.
+c. Have a lot of questions. We'll get to those in future lessons, and you can always join the discord and ask them.
+

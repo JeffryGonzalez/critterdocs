@@ -1,0 +1,223 @@
+---
+title: Getting All Courses
+---
+import { Aside } from '@astrojs/starlight/components';
+
+We have a good start. We can add a course, and we can retrieve a single course by Id - both things our frontend needs to work.
+
+But we still don't have a way to retrieve all courses so we can show a list of courses. Let's add that now.
+
+## Video Walkthrough
+
+Here is a video walkthrough of this section. If you prefer to read the code, you can skip this and continue reading below.
+
+<div style="padding:56.25% 0 0 0;position:relative;"><iframe src="https://player.vimeo.com/video/1092800077?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="JasperFx Getting Started - 2 - Getting Courses"></iframe></div><script src="https://player.vimeo.com/api/player.js"></script>
+
+
+## Getting All Courses
+
+<Aside type="note">This is *one* way to do this. It's a reasonable default. It also has the advantage of being a way to introduce more about projections in the Critter Stack.</Aside>
+
+In our last section, we created a `Course` projection that is used to retrieve a single course by Id. We can use that same projection to retrieve all courses, but we need to add a few things to it. This projection is created *on demand* when we retrieve a course by Id. It is *ephemeral* and not stored in the database.
+
+As I said in the last section, it is really a "query" that says "go through all the events in `mt_events` and find all the events that have this stream ID, and figure out what the current state of the course is". 
+
+Folks worry sometimes that this is an expensive operation, but in my experience, it really isn't. The combination of PostgreSQL and Marten is really good at this, and it is fast enough for most applications. And you get the added benefit of it being "accurate" at the time of the query. None of this "eventual consistency" stuff 
+that worries some folks that have grown up in the ideology of "transactional consistency". 
+
+But we can opt-in to *other* consistency models if we want to and even "pre-materialize" the projections so they exist in the database and are fast to retrieve.
+
+If we do that, we get the added benefit of just having a table (really, a *document*) in the database we can query against. This is what we will do in this section.
+
+## When To Materialize Projections
+
+What we are doing now, in our `GET /api/course/{id}` endpoint is called a "live" projection. It is created on demand, and it is not stored in the database. This is a good default for most applications, but there are times when you might want to "materialize" the projection and store it in the database. Frankly, this is where I 
+always start, and then optimize it later if I need to.
+
+Another option, at the other end of the spectrum, is an "eventual consistency" model. We tell the Critter Stack to start a background process that runs alongside our application (and can even be in another process altogether) that will listen for events and update the projection in the database. This is a good option if you have a lot of events and you want to keep the projection up to date without having to query the events every time. However, it is somewhat non-deterministic. You could have a situation where a new course is created, and then retrieved, but that background process (called the "Async Daemon") hasn't processed the event and updated the projection.
+
+This is where a *lot* of event sourcing tools stop. They give you these two options. Admittedly, a lot of great software has been built with just these two options, but the Critter Stack gives you a third option that is really powerful.
+
+### Inline Projections 
+
+The Critter Stack is built upon PostgreSQL which has great support of relational data and document data. It is also *transactional* (unlike some NoSQL databases), which means that you can have a "live" projection that is stored in the database and updated in real-time as events are processed in the same database transaction. This is what we call an "inline projection". While this can be a little more taxing to process, it is also the most accurate and up-to-date projection you can have. Our projections are immediately consistent with the events in the stream.
+
+<Aside type="tip">I don't want to underplay the power of Async projections. Frankly, they are usually my "go to" for most applications where I can't get away with live projections. They have a great scalability story in the Critter Stack, and they are easy to implement. I am using Live projections here because they are so awesome and possibly unique to the Critter Stack.</Aside>
+
+As with almost all of these things, there are a lot of ways to implement this, but I'm going to show you my *default* way to do this. We will convert our `Course` projection into a `SingleStreamProjection` that will be stored in the database and updated in real-time as events are processed.
+
+#### Single-Stream? Multi-Stream? Don't Cross the Streams!
+
+The Critter Stack and Marten have a lot of different ways to create projections and every query the row stream of events. A *Single Stream Projection* is a projection that, as the name implies, applies only to events in a single stream. This is the most common type of projection, and it is what we will use here.
+A *Multi Stream Projection* is a projection that applies to events in multiple streams. This is useful when you want to create a projection that aggregates data from multiple streams, but it is not what we will use here, but will explore in the future.
+
+Let's convert our `Course` projection into a `SingleStreamProjection` that will be stored in the database and updated in real-time as events are processed.
+
+Again, a full listing of the code will be provided at the end of this section, but here is the important part.
+
+First we will remove the `Create` handler in the `Course` projection:
+
+```csharp showLineNumbers title="CourseProjection.cs" del={8-14}
+public record Course(
+    public Guid Id { get; set; }
+    public int Version { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int NumberOfDays { get; set; }
+
+    public static Course Create(CourseCreated courseCreated) =>
+        new Course
+        {
+            Title = courseCreated.Title,
+            Description = courseCreated.Description,
+            NumberOfDays = courseCreated.NumberOfDays
+        };
+)
+```
+
+And we will move it to a new class that inherits from `SingleStreamProjection`:
+
+```csharp showLineNumbers title="CourseProjection"
+public class CourseProjection : SingleStreamProjection<Course, Guid>
+{
+    public static Course Create(CourseCreated evt)
+    {
+        return new Course
+        {
+            Title = evt.Title,
+            Description = evt.Description,
+            NumberOfDays = evt.NumberOfDays
+        };
+    }
+}
+```
+
+That's simply the old `Create` method moved to a new class. That class inherits from `SingleStreamProjection<Course, Guid>`, which tells the Critter Stack that this projection is for a single stream of events that has a `Guid` as its Id.
+
+The last step will be to tell Marten about the existence of this so it can do it's "magic". We will do that in the `Program.cs` file, where we add Marten to the service collection:
+
+```csharp showLineNumbers title="Program.cs" add={7}
+builder.Services.AddMarten(config =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("db") ??
+                               throw new Exception("Connection string not found");
+        config.Connection(connectionString);
+
+        config.Projections.Add<CourseProjection>(ProjectionLifecycle.Inline);
+
+    }).IntegrateWithWolverine()
+    .UseLightweightSessions();
+```
+
+Now, when we add a course (add a `CourseCreated` event), the `CourseProjection` will be updated in real-time, and we can retrieve all courses from the database. There will be a new table in the database called `mt_courses` that will contain all the courses that have been created.
+
+<Aside type="note">This is a *Inline* projection, which means that it is updated in real-time as events are processed. This is the most accurate and up-to-date projection you can have. However, as we are adding it after we have already (perhaps) added a few `CourseAdded` events, 
+those won't be considered in the projection. We would need to "replay" those events to get the projection up to date. This is a common pattern in event sourcing, and it is something we will explore in the future.</Aside>
+
+## Getting the Course List 
+
+We don't have to make any changes to our existing `POST` and `GET /api/course/{id}` endpoints. We can simply add a new endpoint to retrieve all courses. A side effect of using an `Inline` project (or `Async` projection) is that we can directly query that table in the database to get all the courses.
+
+Using Marten's `IDocumentSession`, we can do that pretty easily. Add a method to your `Courses/Api` class like this:
+
+```csharp showLineNumbers title="Courses/Api.cs"
+[WolverineGet("/api/courses")]
+public async static Task<Ok<IReadOnlyList<Course>>> Get(IDocumentSession session)
+{
+    var response = await session.Query<Course>().ToListAsync();
+
+    return TypedResults.Ok(response);
+}
+```
+
+That'll do it. 
+
+<Aside type="note">The `session.Query` method is a Marten method for querying documents. Marten is a document database as well as an event store, so it has a lot of powerful querying capabilities. It supports LINQ queries, so you could also write a query that, for example, filters courses by title or description, or sorts them by number of days.</Aside>
+
+We should be able to get our frontend in a better state. If you rerun the application and, in the browser, click the "Courses" link, all your courses should show up. If you don't have any yet, you can add a few using the "Add Course" button (since we've already implemented that in the last section).
+
+### Full Code Listing of `Courses/API.cs`
+
+```csharp showLineNumbers title="Courses/Api.cs"
+using Marten;
+using Marten.Events.Aggregation;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Wolverine.Http;
+using Wolverine.Http.Marten;
+using Wolverine.Marten;
+
+namespace Courses.Api.Courses;
+
+public record CreateCourseRequest(
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+public record CreateCourseResponse(
+    Guid Id, 
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+// Events 
+
+public record CourseCreated(string Title, string Description, int NumberOfDays);
+
+// Read Models
+
+public record Course
+{
+    public Guid Id { get; set; }
+    public int Version { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int NumberOfDays { get; set; }
+    
+}
+
+public class CourseProjection : SingleStreamProjection<Course, Guid>
+{
+    public static Course Create(CourseCreated evt)
+    {
+        return new Course
+        {
+            Title = evt.Title,
+            Description = evt.Description,
+            NumberOfDays = evt.NumberOfDays
+        };
+    }
+}
+
+public static class Api
+{
+    [WolverinePost("/api/courses")]
+    public static (Created<CreateCourseResponse>, IStartStream) Post(CreateCourseRequest request)
+    {
+        var op = MartenOps.StartStream<Course>(new CourseCreated(request.Title, request.Description,
+            request.NumberOfDays));
+        var response = new CreateCourseResponse(
+            Id: op.StreamId,
+            Title: request.Title,
+            Description: request.Description,
+            NumberOfDays: request.NumberOfDays
+        );
+        var responseMessage = TypedResults.Created($"/api/courses/{response.Id}", response);
+        return (responseMessage, op);
+    }
+
+
+
+    [WolverineGet("/api/courses/{id:guid}")]
+    public static Course Get([ReadAggregate] Course course) => course;
+
+    [WolverineGet("/api/courses")]
+    public async static Task<Ok<IReadOnlyList<Course>>> Get(IDocumentSession session)
+    {
+        var response = await session.Query<Course>().ToListAsync();
+
+        return TypedResults.Ok(response);
+    } 
+}
+```

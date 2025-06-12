@@ -1,0 +1,148 @@
+---
+title: Deleting a Course
+---
+
+
+import { Aside } from '@astrojs/starlight/components';
+
+We still need a way to delete a course (as well as assign an instructor, which we'll cover in the next lesson).
+
+Believe it or not, the hard part is pretty done. 
+
+Since we are using event sourcing, all we have to do is append an event to the stream indicating that the course has been deleted. We'll update our projection to indicate that the presence of this event in the stream is the *end of the line* for this particular course. (Don't worry, remember the "Course" is a stream of events, and those aren't going *anywhere*. We can recreate a projection at any time, so we can always "undelete" a course if we need to.)
+
+## Video Walkthrough
+
+<div style="padding:56.25% 0 0 0;position:relative;"><iframe src="https://player.vimeo.com/video/1092807230?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="JasperFx Getting Started -3 - Deleting Courses"></iframe></div><script src="https://player.vimeo.com/api/player.js"></script>
+
+## Create the Event 
+
+In your `Courses/Api.cs` file, add the following event:
+
+```csharp
+public record CourseDeleted();
+```
+
+Easy, right? We'll add an HTTP `Delete` endpoint to our `Api` class to append this event to the stream. 
+
+```csharp title="Api"
+[WolverineDelete("/api/courses/{id:guid}"), EmptyResponse]
+public static CourseDeleted Delete([Aggregate] Course course) => new CourseDeleted();
+```
+
+Again, other ways we could implement this, but you can't argue the simplicity of this.
+
+Notice the `EmptyResponse` attribute. This tells Wolverine that the thing we are returning (`CourseDeleted`) is not a response to be sent to the client, but rather an event that is being appended to the stream identified by the Stream Id of the `Course` aggregate.
+
+## Update the Projection
+
+The only thing left to do is update our projection to indicate that the `Course` should be considered "deleted" when it sees the `CourseDeleted` event.
+
+```csharp title="CourseProjection" ins={13}
+public class CourseProjection : SingleStreamProjection<Course, Guid>
+{
+    public static Course Create(CourseCreated evt)
+    {
+        return new Course
+        {
+            Title = evt.Title,
+            Description = evt.Description,
+            NumberOfDays = evt.NumberOfDays
+        };
+    } 
+
+    public bool ShouldDelete(CourseDeleted evt) => true;
+}
+```
+
+That's it. We have two methods in our projection now: `Create` and `ShouldDelete`. The `Create` method is called when the `CourseCreated` event is appended to the stream and it creates a new `Course` projection, and the `ShouldDelete` method is called when the `CourseDeleted` event is appended to the stream. If that `ShouldDelete` returns a true, then the projection is considered deleted, and since we are using a `Live` projection, it will be removed from the database table (`mt_courses`). 
+
+<Aside type="note">
+Again, this is a simple example, and it will only apply to courses that are created *after* this code is deployed. If you want to apply this to existing courses, you will need to rebuild your projections. We'll learn how to do that in a later lesson, but you can check the documentation for details. Since we aren't in "production" yet, this isn't a problem. As a matter of fact, you can always `docker compose down` and `docker compose up -d` to reset your database and start fresh if you want to test this out with a "fresh" database.
+</Aside>
+
+
+### Final Code For The `Courses/Api.cs` File At This Point:
+
+```csharp showLineNumbers title="Courses/Api.cs" ins={31, 51, 77-78}
+using Marten;
+using Marten.Events.Aggregation;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Wolverine.Http;
+using Wolverine.Http.Marten;
+using Wolverine.Marten;
+
+namespace Courses.Api.Courses;
+
+public record CreateCourseRequest(
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+public record CreateCourseResponse(
+    Guid Id, 
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+// Events 
+
+public record CourseCreated(
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+public record CourseDeleted();
+// Read Models
+
+public record Course
+{
+    public Guid Id { get; set; }
+    public int Version { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int NumberOfDays { get; set; }
+
+     public static Course Create(CourseCreated evt)
+    {
+        return new Course
+        {
+            Title = evt.Title,
+            Description = evt.Description,
+            NumberOfDays = evt.NumberOfDays
+        };
+    }
+    public bool ShouldDelete(CourseDeleted evt) => true;
+}
+
+
+public static class Api
+{
+
+    [WolverinePost("/api/courses")]
+    public static (Created<CreateCourseResponse>, IStartStream) Post(CreateCourseRequest request)
+    {
+
+        var op = MartenOps.StartStream<Course>(new CourseCreated(request.Title, request.Description,
+            request.NumberOfDays));
+        var response = new CreateCourseResponse(
+            Id: op.StreamId,
+            Title: request.Title,
+            Description: request.Description,
+            NumberOfDays: request.NumberOfDays
+        );
+        var responseMessage = TypedResults.Created($"/api/courses/{response.Id}", response);
+        return (responseMessage, op);
+    }
+
+    [WolverineGet("/api/courses/{id:guid}")]
+    public static Course Get([ReadAggregate] Course course) => course;
+
+    [WolverineDelete("/api/courses/{id:guid}"), EmptyResponse]
+    public static CourseDeleted Delete([Aggregate] Course course) => new CourseDeleted();
+
+}
+```
