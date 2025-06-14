@@ -2,12 +2,13 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import starlightAutoSidebar from 'starlight-auto-sidebar'
+import tailwindcss from '@tailwindcss/vite';
 // https://astro.build/config
 export default defineConfig({
-
   integrations: [
     starlight({
       title: "JasperFx: Critter Stack",
+      customCss: ['./src/styles/global.css'],
       social: [{
       label: "GitHub",
       href:"https://github.com/JeffryGonzalez/critterdocs",
@@ -36,4 +37,8 @@ export default defineConfig({
       ],
     }),
   ],
+
+  vite: {
+    plugins: [tailwindcss()],
+  },
 });

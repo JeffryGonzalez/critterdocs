@@ -11,10 +11,13 @@
   },
   "dependencies": {
     "@astrojs/starlight": "^0.34.4",
+    "@astrojs/starlight-tailwind": "^4.0.1",
     "@expressive-code/plugin-line-numbers": "^0.41.2",
+    "@tailwindcss/vite": "^4.1.10",
     "astro": "^5.9.3",
     "sharp": "^0.32.5",
-    "starlight-auto-sidebar": "^0.1.2"
+    "starlight-auto-sidebar": "^0.1.2",
+    "tailwindcss": "^4.1.10"
   },
   "volta": {
     "node": "22.15.1",

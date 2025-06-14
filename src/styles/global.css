@@ -1,0 +1,13 @@
+@layer base, starlight, theme, components, utilities;
+
+@import '@astrojs/starlight-tailwind';
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@theme {
+  --color-jasper-fx-orange: #da6109;
+  --color-jasper-fx-olive: #978a31;
+  --color-jasper-fx-plum: #9e2a68;
+  --color-jasper-fx-dark: #2b0c3b;
+  --color-jasper-fx-bluish: #7550c7;
+}
