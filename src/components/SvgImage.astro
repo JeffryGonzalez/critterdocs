@@ -1,0 +1,7 @@
+---
+const { src, alt = '', width, height, class: className = '' } = Astro.props;
+
+---
+<div class="dark:hue-rotate-180 dark:invert-180">
+  <img src={src} alt={alt} width={width} height={height} class={className} />
+</div>
