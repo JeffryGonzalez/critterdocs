@@ -11,3 +11,22 @@
   --color-jasper-fx-dark: #2b0c3b;
   --color-jasper-fx-bluish: #7550c7;
 }
+
+[data-page-title] {
+  @apply text-4xl font-bold mb-4 text-jasper-fx-orange
+}
+
+a .title {
+  @apply text-3xl font-bold mb-4 text-jasper-fx-olive no-underline hover:underline
+}
+
+.content-panel h1, h2, h3, h4, h5, h6 {
+  @apply text-jasper-fx-orange
+}
+.content-panel h1 {
+  @apply text-3xl 
+}
+
+.header .site-title {
+  @apply text-3xl font-bold text-jasper-fx-orange
+}

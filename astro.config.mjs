@@ -7,7 +7,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   integrations: [
     starlight({
-      title: "JasperFx: Critter Stack",
+      title: "JasperFx Training",
       customCss: ['./src/styles/global.css'],
       social: [{
       label: "GitHub",
