@@ -1,7 +1,7 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
-
+import starlightAutoSidebar from 'starlight-auto-sidebar'
 // https://astro.build/config
 export default defineConfig({
 
@@ -13,30 +13,26 @@ export default defineConfig({
       href:"https://github.com/JeffryGonzalez/critterdocs",
         icon: "github",
       }],
+      plugins: [starlightAutoSidebar()],
       sidebar: [
         {
           label: "Tutorials",
 
-          items: [
-            { label: "Overview", link: "/tutorials/" },
-            { label:"Getting Started", autogenerate: { directory: "tutorials/Intro" } },
-           
-           
-          ],
+          autogenerate: { directory: 'tutorials'}
         },
         {
-          label: "How-to Guides",
-          autogenerate: { directory: "howto" },
-        },
-
-        {
-          label: "Reference",
-          autogenerate: { directory: "reference" },
+            label: 'How-To Guides',
+            autogenerate: { directory: 'howto' }
         },
         {
-          label: "Explanation",
-          autogenerate: { directory: "explanation" },
+            label: 'Reference',
+            autogenerate: { directory: 'reference' }
+        },
+        { 
+            label: 'Deep Dives',
+            autogenerate: { directory: 'explanation' }
         }
+    
       ],
     }),
   ],
