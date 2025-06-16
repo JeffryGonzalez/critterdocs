@@ -3,6 +3,7 @@ title: Project Setup
 ---
 
 import { Card } from '@astrojs/starlight/components';
+import { Steps } from '@astrojs/starlight/components';
 
 You will need a few things to get started here:
 
@@ -43,3 +44,31 @@ npx gitpick JeffryGonzalez/critterdocs/tree/main/projects/JasperHappyPath_Final
 ```
 In another directory. Make sure you start the container!
 </Card>
+
+## Alternative Ways to Create the Project
+
+### Download a Zip File of the Starter Project
+
+You can download an extract a zip file of the starter project from [here](https://github.com/)
+
+> TODO: Create the Zip File.
+
+### Create the Project by Hand
+
+
+If you want to create the project by hand, you can follow these steps:
+
+<Steps>
+1. Create a new .NET 9 Empty Web API project. You can use your IDE of choice, or run the following command in an empty directory in your terminal:
+    ```bash
+    dotnet new sln -o CoursesSolution
+    cd CoursesSolution
+    dotnet new web -n Courses.Api
+    dotnet new sln -o CoursesSolution
+    cd Courses.Api
+    dotnet add package WolverineFx.Http --version 4.2.0
+    dotnet add package WolverineFx.Http.Marten --version 4.2.0
+    ```
+2. (Optional) if you want the frontend code, you can create a `wwwroot` directory in the `Courses.Api` project and add your frontend code there. You can use any frontend framework you like, but for this tutorial, we will use a simple Angular app to make the API calls.
+
+</Steps>

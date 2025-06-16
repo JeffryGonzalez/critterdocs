@@ -34,6 +34,8 @@ Again, other ways we could implement this, but you can't argue the simplicity of
 
 Notice the `EmptyResponse` attribute. This tells Wolverine that the thing we are returning (`CourseDeleted`) is not a response to be sent to the client, but rather an event that is being appended to the stream identified by the Stream Id of the `Course` aggregate.
 
+Also notice the use of the `[Aggregate]` attribute here, instead of the `[ReadAggregate]` attribute. This is because we want to append the `CourseDeleted` event to the stream, and we need to have the `Course` aggregate loaded in order to do that.[^1]
+
 ## Update the Projection
 
 The only thing left to do is update our projection to indicate that the `Course` should be considered "deleted" when it sees the `CourseDeleted` event.
@@ -60,6 +62,7 @@ That's it. We have two methods in our projection now: `Create` and `ShouldDelete
 <Aside type="note">
 Again, this is a simple example, and it will only apply to courses that are created *after* this code is deployed. If you want to apply this to existing courses, you will need to rebuild your projections. We'll learn how to do that in a later lesson, but you can check the documentation for details. Since we aren't in "production" yet, this isn't a problem. As a matter of fact, you can always `docker compose down` and `docker compose up -d` to reset your database and start fresh if you want to test this out with a "fresh" database.
 </Aside>
+
 
 
 ### Final Code For The `Courses/Api.cs` File At This Point:
@@ -146,3 +149,5 @@ public static class Api
 
 }
 ```
+
+[^1]: You can read more about the difference between `[Aggregate]` and `[ReadAggregate]` in the [Marten documentation](https://martendb.io/events/projections/read-aggregates.html). Briefly, use `[Aggregate]` when you want to append events to the stream associated with the aggregate, and use `[ReadAggregate]` when you want to read the current state of the aggregate without modifying it.

@@ -6,5 +6,13 @@ Just a place for examples and stuff.
 
 ## Adaptable SVG from Exaclidraw
 
-<SvgImage src="events.svg" alt="Demo"  />
+I figured out a way to make SVG files work in both light and dark modes. Turns out it's just a bit of CSS wizardry, but in this project you can just use a component I created called `SvgImage`. You can use it like this:
+
+```jsx
+<SvgImage src="events.svg" alt="Demo" width="500" height="500" />
+```
+
+The image should be in the `public` folder. The component will automatically adjust the colors based on the current theme.
+
+<SvgImage src="events.svg" alt="Demo" width="500" height="500" />
 </StarlightPage>

@@ -1,0 +1,11 @@
+
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+import { LinkCard } from '@astrojs/starlight/components';
+
+<StarlightPage frontmatter= {{ title: 'Notes', template: 'splash'}}>
+
+<LinkCard title="Guide To Structure" href="/guide" />
+<LinkCard title="Todo List" href="/todo" />
+<LinkCard title="Scratch: Demos, etc." href="/scratch" />
+
+</StarlightPage>
