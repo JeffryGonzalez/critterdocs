@@ -1,0 +1,53 @@
+---
+title: Getting Started Summary
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+We hope that by this point you are beginning to get a feel for how the JasperFx Critter Stack can help you build applications in a more flexible and resilient way.
+
+The Critter Stack is *opinionated*, but also extremely flexible. You can pick and choose the pieces you want to use, and you can implement your own custom logic if you need to. Where it really shines, however, is when you "buy in", so to speak, to the conventions and patterns associated with Event Sourcing.
+
+## Event Sourcing
+
+Event sourcing is, briefly, is a way of storing the state of an application as a series of events that have occurred over time. Instead of storing the current state of an object, you store the events that have led to that state. This allows you to reconstruct the state of an object at any point in time, and it also allows you to "replay" events to change the state of an object.
+
+This is very different than how I was "brought up" as a software developer. I remember being taught that the *first thing* you do when building an application is to create a database schema, and then you build your application around that schema. I remember being taught that approach in school and thought I got pretty good at it.
+
+Then I got into the "real world". The approach of "database first, schema first" is a recipe for disaster. I found it means that basically you have to design the entire application up front, before you even start writing any code. In simple, proven, cases, this might work. As a matter of fact, for the application we are building
+here we could get away with that approach, but as you'll see as the course goes on, the Critter Stack allows you to build your application in a more flexible way that is much more resilient to change.
+
+And the "real world" (for me, anyhow) is all about change. We almost never know what is coming down the pike, and we have to be able to adapt quickly. The Critter Stack is designed to help you do just that.
+
+When implementing event sourcing, I think of it like a good police procedural drama. You impartially "take notes" of what has happened, and *then* derive meaning from those notes. These "notes" are the events we record. Events are a record of something that has happened in the past, and they are immutable. 
+
+At the end of this tutorial we were able to make the application "work". We can add courses, delete them, and assign instructors. We could store all of that in a relational database with a "courses" table, or a document database (Marten does documents better than about any other database out there), but we did this using the *event sourcing* approach.
+
+The key "payoff" for this approach is that we can reconstruct the state of the application at any point in time by replaying the events. This allows us to build projections that can be used to query the state of the application, and it also allows us to "undo" changes if needed. 
+
+Another way to say this is that while *planning* an application is important, you can't always (read: rarely) anticipate all the changes that will be needed in your application over time. We need to accommodate other interactions with our system, and we need to allow new interpretations of the things that have happened over time. 
+
+So far, we have introduced some key concepts in the Critter Stack:
+
+### Events
+
+ An event is a record of something that has happened in the past. It is immutable and cannot be changed. They are merely a record of some kind of interaction with the system. 
+
+ Often, an event has a specific purpose in our application. For example, in our course application, we have events like `CourseCreated`, `CourseDeleted`, and `InstructorAssignedToCourse`. These events are used to record the state of the application at a specific point in time. All these events are related to a *concept*, a *thing* that has business meaning within our application. In this tutorial, I gave you a big hint by putting the name of that *thing* right in the event name: `Course`.
+
+ We think of these *things*, these *concepts* in event sourcing as a *stream*. A stream is a series of events that are related to a specific concept. In our case, the `Course` stream is a series of events that are related to a specific course.
+
+ With the `CreateCourse` event, a new `Course` comes to life within our system. It has methods that apply other events (like `InstructorAssignedToCourse`) to change the make-up of the course. The other event, `CourseDelete`, is interpreted by the "thing" to mean it is time to move on to the big bit bucket in the sky. 
+
+
+ You could say that the `Course`'s purpose is to *aggregate* together a set of related events in a meaningful way. The events we created in this tutorial are all related to the `Course` concept, and they are all stored in a single stream - one for each course. The `Course` aggregate is responsible for managing the state of the course and applying the events to change that state *over time*.  
+
+### Projections 
+
+There are several ways to create projections of the state of an aggregate in the Critter Stack. In this tutorial we started simply, with just a record with some properties on it, and used a `static Create` method to indicate how to create the projection from the `CourseCreated` event.
+
+We moved to a `SingleStreamProjection`, and this allowed us to have this projection *pre-aggregated* in the database. Prior to this, it was created from the stream of events each time it was created.
+
+We added additional convention-based methods to the projection class to inform Marten how to apply other events.
+
+<LinkCard title="See A Visualization" href="/tutorials/intro/099-visualize" />

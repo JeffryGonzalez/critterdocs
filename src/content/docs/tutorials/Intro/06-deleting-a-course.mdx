@@ -4,18 +4,25 @@ title: Deleting a Course
 
 
 import { Aside } from '@astrojs/starlight/components';
+import  VimeoVideo  from '@components/VimeoVideo.astro';
+import { Tabs, TabItem } from '@astrojs/starlight/components';
 
+
+## What We Will Learn
 We still need a way to delete a course (as well as assign an instructor, which we'll cover in the next lesson).
 
 Believe it or not, the hard part is pretty done. 
 
 Since we are using event sourcing, all we have to do is append an event to the stream indicating that the course has been deleted. We'll update our projection to indicate that the presence of this event in the stream is the *end of the line* for this particular course. (Don't worry, remember the "Course" is a stream of events, and those aren't going *anywhere*. We can recreate a projection at any time, so we can always "undelete" a course if we need to.)
 
-## Video Walkthrough
+In this section we will learn how to implement an `HTTP DELETE` endpoint that adds an event to a an aggregate's stream indicating the projection should be removed.
 
-<div style="padding:56.25% 0 0 0;position:relative;"><iframe src="https://player.vimeo.com/video/1092807230?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="JasperFx Getting Started -3 - Deleting Courses"></iframe></div><script src="https://player.vimeo.com/api/player.js"></script>
 
-## Create the Event 
+<VimeoVideo videoId="1092807230" title="Deleting a Course" />
+
+
+
+## Define the Event 
 
 In your `Courses/Api.cs` file, add the following event:
 
@@ -65,9 +72,12 @@ Again, this is a simple example, and it will only apply to courses that are crea
 
 
 
-### Final Code For The `Courses/Api.cs` File At This Point:
+### Final Code At This Point
 
-```csharp showLineNumbers title="Courses/Api.cs" ins={31, 51, 77-78}
+<Tabs>
+<TabItem label="Courses/Courses.Api.Cs">
+
+```csharp
 using Marten;
 using Marten.Events.Aggregation;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -149,5 +159,7 @@ public static class Api
 
 }
 ```
+</TabItem>
+</Tabs>
 
 [^1]: You can read more about the difference between `[Aggregate]` and `[ReadAggregate]` in the [Marten documentation](https://martendb.io/events/projections/read-aggregates.html). Briefly, use `[Aggregate]` when you want to append events to the stream associated with the aggregate, and use `[ReadAggregate]` when you want to read the current state of the aggregate without modifying it.

@@ -1,0 +1,9 @@
+---
+const { videoId, title } = Astro.props;
+const path = `https://player.vimeo.com/video/${videoId}?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479`
+---
+
+<div class="w-full">
+    <h2 class="text-lg font-bold mb-2 pl-2"><span>Video Walkthrough:</span><span class="text-jasper-fx-olive ml-4">{title}</span></h2>
+    <div style="padding:56.25% 0 0 0;position:relative;"><iframe src={path} frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="JasperFx Getting Started - 1 - Create and Get Courses"></iframe></div><script src="https://player.vimeo.com/api/player.js"></script>
+ </div>

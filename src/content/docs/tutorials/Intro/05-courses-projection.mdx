@@ -2,21 +2,21 @@
 title: Getting All Courses
 ---
 import { Aside } from '@astrojs/starlight/components';
+import  VimeoVideo  from '@components/VimeoVideo.astro';
+import { Tabs, TabItem } from '@astrojs/starlight/components';
 
+
+## What We Will Learn
 We have a good start. We can add a course, and we can retrieve a single course by Id - both things our frontend needs to work.
 
 But we still don't have a way to retrieve all courses so we can show a list of courses. Let's add that now.
 
-## Video Walkthrough
+In this section we will learn how to "materialize" our projection and retrieve *all* the course projections.
 
-Here is a video walkthrough of this section. If you prefer to read the code, you can skip this and continue reading below.
 
-<div style="padding:56.25% 0 0 0;position:relative;"><iframe src="https://player.vimeo.com/video/1092800077?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="JasperFx Getting Started - 2 - Getting Courses"></iframe></div><script src="https://player.vimeo.com/api/player.js"></script>
-
+<VimeoVideo videoId="1092800077" title="Getting All Courses" />
 
 ## Getting All Courses
-
-<Aside type="note">This is *one* way to do this. It's a reasonable default. It also has the advantage of being a way to introduce more about projections in the Critter Stack.</Aside>
 
 In our last section, we created a `Course` projection that is used to retrieve a single course by Id. We can use that same projection to retrieve all courses, but we need to add a few things to it. This projection is created *on demand* when we retrieve a course by Id. It is *ephemeral* and not stored in the database.
 
@@ -136,8 +136,10 @@ That'll do it.
 
 We should be able to get our frontend in a better state. If you rerun the application and, in the browser, click the "Courses" link, all your courses should show up. If you don't have any yet, you can add a few using the "Add Course" button (since we've already implemented that in the last section).
 
-### Full Code Listing of `Courses/API.cs`
+### Final Code At This Point
 
+<Tabs>
+<TabItem label="Courses/Api.cs">
 ```csharp showLineNumbers title="Courses/Api.cs"
 using Marten;
 using Marten.Events.Aggregation;
@@ -221,3 +223,58 @@ public static class Api
     } 
 }
 ```
+</TabItem>
+<TabItem label="Program.cs">
+```csharp
+using System.Text.Json.Serialization;
+using Courses.Api.Courses;
+using JasperFx.Events.Projections;
+using Marten;
+using Microsoft.Extensions.FileProviders;
+using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseWolverine(options =>
+{
+    options.Policies.AutoApplyTransactions();
+});
+builder.Services.AddDirectoryBrowser();
+builder.Services.AddMarten(config =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("db") ??
+                               throw new Exception("Connection string not found");
+        config.Connection(connectionString);
+
+        config.Projections.Add<CourseProjection>(ProjectionLifecycle.Inline);
+    }).IntegrateWithWolverine()
+    .UseLightweightSessions();
+
+builder.Services.AddWolverineHttp();
+
+builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+var app = builder.Build();
+
+if (app.Environment.EnvironmentName == "Frontend")
+{
+    app.MapReverseProxy();
+}
+else
+{
+    app.UseDefaultFiles();
+
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.WebRootPath, "app")),
+        RequestPath = "/app"
+    });
+}
+
+app.MapWolverineEndpoints();
+
+app.Run();
+```
+</TabItem>
+</Tabs>

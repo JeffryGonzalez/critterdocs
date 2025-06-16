@@ -3,23 +3,31 @@ title: Adding and Retrieving A Course
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import  VimeoVideo  from '@components/VimeoVideo.astro';
+import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-If you open the web page served by our application, and go to the courses page, you will see an error. It is calling our non-existent API endpoint, and it is failing with a 404 Not Found error. 
+
+
+
+## What We Will Learn
+
+Right now, if you open the web page served by our application, and go to the courses page, you will see an error. It is calling our non-existent API endpoint, and it is failing with a 404 Not Found error. 
 
 We need a way to get a list of courses to display here. A bit of a chicken and egg problem, but we can solve it by implementing the `GET /api/courses` endpoint, *after* we create a way to add a course.
 
 We will start by implementing the `POST /api/courses` endpoint, which will allow us to create a new course, and then we will implement the `GET /api/courses/{id}` endpoint to retrieve the course we just created.
 
+In this section, we will learn how to:
+- Create a new course using the `POST /api/courses` endpoint
+- Defining a Read Model Projection
+- Retrieve a course using the `GET /api/courses/{id}` endpoint
+- Understand the basics of Event Sourcing and Projections in Marten
+
 In our next section, Projections, we will look at a way to implement the logic to get a full list of courses using Marten Projections, but for now, we will just implement the basic functionality to add and retrieve a course.
 
-## Video Walkthrough
-Here is a video walkthrough of this section, where I will show you how to implement the `POST /api/courses` and `GET /api/courses/{id}` endpoints. You can follow along with the code examples below, or just watch the video to see how it all works.
+<VimeoVideo videoId="1092755931" title="Adding and Getting a Course" />
 
-The video walkthrough has some more details than I'll show below, so I recommend watching it if you want to see alternatives and hear some rationale.
-
-<div style="padding:56.25% 0 0 0;position:relative;"><iframe src="https://player.vimeo.com/video/1092755931?badge=0&amp;autopause=0&amp;player_id=0&amp;app_id=58479" frameborder="0" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="JasperFx Getting Started - 1 - Create and Get Courses"></iframe></div><script src="https://player.vimeo.com/api/player.js"></script>
-
-## Adding a Course
+### Create a New Course Using the `POST /api/courses` Endpoint
 
 First, file and project organization is up to you. I have a tendency to be a little "messy" with my code organization while figuring things out, so I put tons of stuff in the same file, and try to remember to organize it a bit more before I commit it to the repository. 
 
@@ -30,35 +38,8 @@ I'm going to implement this as a static class with my endpoints, but you can als
 Assuming you've created .NET APIs before, you are no-doubt familiar with the the various attributes that you can use to define your endpoints, like `[HttpGet]`, `[HttpPost]`, etc. Wolverine has its own set of attributes that you can use to define your endpoints, and they are very similar to the ones you are used to, however
 they add considerable "super powers" when you are implementing your backend with the "Critter Stack", especially when it comes to working with Marten and the event store.
 
-### Short Explanation of the Approach
 
-The Critter Stack is *opinionated*, but also extremely flexible. You can pick and choose the pieces you want to use, and you can implement your own custom logic if you need to. Where it really shines, however, is when you "buy in", so to speak, to the conventions and patterns associated with Event Sourcing.
-
-**Event Sourcing**, briefly, is a way of storing the state of an application as a series of events that have occurred over time. Instead of storing the current state of an object, you store the events that have led to that state. This allows you to reconstruct the state of an object at any point in time, and it also allows you to "replay" events to change the state of an object.
-
-This is very different than how I was "brought up" as a software developer. I remember being taught that the *first thing* you do when building an application is to create a database schema, and then you build your application around that schema. I remember being taught that approach in school and thought I got pretty good at it.
-
-Then I got into the "real world". The approach of "database first, schema first" is a recipe for disaster. I found it means that basically you have to design the entire application up front, before you even start writing any code. In simple, proven, cases, this might work. As a matter of fact, for the application we are building
-here we could get away with that approach, but as you'll see as the course goes on, the Critter Stack allows you to build your application in a more flexible way that is much more resilient to change.
-
-And the "real world" (for me, anyhow) is all about change. We almost never know what is coming down the pike, and we have to be able to adapt quickly. The Critter Stack is designed to help you do just that.
-
-When implementing event sourcing, I think of it like a good police procedural drama. You impartially "take notes" of what has happened, and *then* derive meaning from those notes. These "notes" are the events we record. Events are a record of something that has happened in the past, and they are immutable. 
-
-At the end of this tutorial we will be able to make the application "work". We will be able to add courses, delete them, assign instructors. We could store all of that in a relational database with a "courses" table, or a document database (Marten does documents better than about any other database out there), but we will be able to do it in a way that is flexible and resilient to change.
-For example, what if the next requirement to show up is they need a management report that lists out some statistics about how many courses were created each month, or how many instructors were assigned to courses? Sure, using a relational database we could do that, but it would take a lot of work to get there, changing the schema, writing queries, etc. And even with that, we'd probably only be able to say "we can start offering you that data *next month*" as we start to record the data in a way that we can query it later.
-
-With event sourcing, we can just decide to interpret our notes in a different way. We have a record of *everything* that has happened, and we can derive meaning from that at any time. We can even change the way we interpret those notes later, without having to change the underlying data.
-
-#### Some Definitions
-
-We are going to gradually introduce some terminology that is important to understand when working with the Critter Stack and Event Sourcing:
-
-- **Event**: An event is a record of something that has happened in the past. It is immutable and cannot be changed.
-- **Projection**: A projection is a way of interpreting events to derive meaning from them. It is a *read model* that is built from the events.
-
-
-### Implementing the `POST /api/courses` Endpoint
+### Defining a Read Model Projection
 
 We will start by creating a couple of "Models" that we will use to represent the data we want to send and receive from our API, and what we will return. I'm going to use C# records for this, but you can use classes if you prefer. Nothing special here.
 
@@ -124,8 +105,6 @@ A couple subtle things to note here:
 
 There are many ways to implement this, but this is my *default* way of doing it. It can be a little confusing the first time you see it, but once you get used to it, it is a very powerful way to think about your applications.
 
-#### Define the "Read Model" Projection.
-
 We are going to create a class (here, a record, but you can use a class if you prefer) that will represent the course in our application. This is the "read model" projection that we will use to retrieve the course later. 
 An important thing to keep in mind is that unlike traditional relational databases, this is just a "guess" at what the idea of a Course will look like in *this context*. We can change it later, and we can even have multiple projections for the same stream of events. As a matter of fact, we will end this tutorial be creating a whole other "lens" through which we can interpret events related to a course. But *we are not defining a schema* here. We are defining a "view" through which we can interpret the events that will happen to a course.
 
@@ -174,8 +153,6 @@ public record Course(
 ``` 
 
 <Aside type="note">Notice we aren't implementing any interfaces we don't own, we aren't inheriting from any base classes, and we aren't using any attributes. This is just a simple record that Marten will use to create the course from the `CourseCreated` event.</Aside>
-
-#### Implementing the `POST /api/courses` Endpoint
 
 Now we can bring it all together. We need an endpoint that the client can:
 
@@ -272,8 +249,10 @@ The `[ReadAggregate]` attribute tells Wolverine to read the `Course` projection 
 And if there is no stream with that Id, it will return a `404 Not Found` response automatically.
 
 
-### Final Code For The `Courses/Api.cs` File At This Point:
+### Final Code At This Point
 
+<Tabs>
+    <TabItem label="Courses/Api.cs">
 ```csharp showLineNumbers title="Courses/Api.cs"
 using Marten;
 using Marten.Events.Aggregation;
@@ -352,3 +331,61 @@ public static class Api
 
 }
 ```
+    </TabItem>
+    <TabItem label="Courses/Program.cs">
+```csharp showLineNumbers title="Courses/Program.cs"
+using System.Text.Json.Serialization;
+using JasperFx.Events.Projections;
+using Marten;
+using Microsoft.Extensions.FileProviders;
+using Wolverine;
+using Wolverine.Http;
+using Wolverine.Marten;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(o =>
+{
+    o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;   
+});
+builder.Host.UseWolverine(options =>
+{
+    options.Policies.AutoApplyTransactions();
+});
+
+builder.Services.AddMarten(config =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("db") ??
+                               throw new Exception("Connection string not found");
+        config.Connection(connectionString);
+
+    }).IntegrateWithWolverine()
+    .UseLightweightSessions();
+
+builder.Services.AddWolverineHttp();
+
+builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+var app = builder.Build();
+
+if (app.Environment.EnvironmentName == "Frontend")
+{
+    app.MapReverseProxy();
+}
+else
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.WebRootPath, "app")),
+        RequestPath = "/app"
+    });
+}
+app.MapWolverineEndpoints();
+app.Run();
+```
+    </TabItem>
+</Tabs>
+
+
+
+
