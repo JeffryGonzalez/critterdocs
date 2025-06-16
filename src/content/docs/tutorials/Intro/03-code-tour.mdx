@@ -1,8 +1,9 @@
 ---
 title: Tour of the Code
 ---
-import csproj from '../../../../../projects/JasperHappyPath_Starter/CoursesSolution/Courses.Api/Courses.Api.csproj?raw'
-import programcs from '../../../../../projects/JasperHappyPath_Starter/CoursesSolution/Courses.Api/Program.cs?raw'
+import csproj from '../../../../../projects/CoursesSolution_Starter/Courses.Api/Courses.Api.csproj?raw';
+import programcs from '../../../../../projects/CoursesSolution_Starter/Courses.Api/Program.cs?raw';
+export const programMarks = [37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,50,51,52,53,54];
 import { Code } from '@astrojs/starlight/components';
 export const nugetHighlight = [`WolverineFx.Http`, `WolverineFx.Http.Marten`];
 
@@ -19,45 +20,14 @@ There are three Nuget packages, but only two of them are really important for th
 - `WolverineFx.Http` - This is the Wolverine package that allows us to create HTTP endpoints.
 - `WolverineFx.Http.Marten` - This is the package that allows us to integrate our Wolverine endpoints with Marten, which is our event store.
 
-<Code code={programcs} lang="csharp"  title="Program.cs"  />
+<Code code={programcs} lang="csharp"  title="Program.cs" mark={programMarks}  />
 
-I'm going to pick out some of the important bits here. There is some additional configuration in the `Program.cs` file for the BFF pattern, but the important parts that you would need to get started would look more like this: 
+Note that the highlighted lines are not part of CritterStack, but are simply there so the frontend application can be served from the `wwwroot` folder of the API project. You can ignore those lines for now, but they are important for the BFF pattern we will be using in this course. 
 
-```csharp showLineNumbers title="Minimal Program.cs" 
-using Marten;
-using Wolverine;
-using Wolverine.Http;
-using Wolverine.Marten;
-
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Host.UseWolverine(options =>
-{
-    options.Policies.AutoApplyTransactions();
-});
-
-builder.Services.AddMarten(config =>
-    {
-        var connectionString = builder.Configuration.GetConnectionString("db") ??
-                               throw new Exception("Connection string not found");
-        config.Connection(connectionString);
-
-    }).IntegrateWithWolverine()
-    .UseLightweightSessions();
-
-builder.Services.AddWolverineHttp();
-
-var app = builder.Build();
-
-app.MapWolverineEndpoints();
-
-app.Run();
-
-```
 
 Let's look at the important parts of this `Program.cs` file:
 
-```csharp showLineNumbers=true startLineNumber=8
+```csharp showLineNumbers=true startLineNumber=16
 builder.Host.UseWolverine(options =>
 {
     options.Policies.AutoApplyTransactions();
@@ -66,7 +36,7 @@ builder.Host.UseWolverine(options =>
 
 We use the extension on the `Host` to configure Wolverine. The `AutoApplyTransactions` policy is a convenience that will automatically apply transactions to our Wolverine endpoints. This is important because we want to make sure that our events are stored in the event store before we return a response to the client.
 
-```csharp startLineNumber=13
+```csharp startLineNumber=21
 builder.Services.AddMarten(config =>
     {
         var connectionString = builder.Configuration.GetConnectionString("db") ??
@@ -84,7 +54,7 @@ You can ignore the stuff about the reverse proxy and all that for now. That's a 
 
 Notice before the call to `var app = builder.Build();` we have this line:
 
-```csharp startLineNumber=22
+```csharp startLineNumber=21
 builder.Services.AddWolverineHttp();
 ```
 
@@ -92,6 +62,6 @@ This will set up the services Wolverine uses to handle HTTP endpoints.
 
 These endpoints (there aren't any *yet*), will be discovered by Wolverine at the line:
 
-```csharp startLineNumber=26
+```csharp startLineNumber=34
 app.MapWolverineEndpoints();
 ```

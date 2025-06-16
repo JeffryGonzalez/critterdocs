@@ -1,0 +1,10 @@
+---
+const { label } = Astro.props;
+---
+
+<div class="p-2 border-2 border-jasper-fx-olive" >
+    <span class="mr-4 cursor-pointer" title="Do This Step as Part of the Tutorial">🪜</span><span class="text-jasper-fx-plum font-black text-xl "><span class="text-jasper-fx-orange">{label}</span></span>
+    <div class="mt-2 ">
+        <slot class="pt-4"/>
+    </div>
+</div>

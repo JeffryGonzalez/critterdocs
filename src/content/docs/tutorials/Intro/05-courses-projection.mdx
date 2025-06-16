@@ -4,7 +4,7 @@ title: Getting All Courses
 import { Aside } from '@astrojs/starlight/components';
 import  VimeoVideo  from '@components/VimeoVideo.astro';
 import { Tabs, TabItem } from '@astrojs/starlight/components';
-
+import DoThis from '@components/DoThis.astro';
 
 ## What We Will Learn
 We have a good start. We can add a course, and we can retrieve a single course by Id - both things our frontend needs to work.
@@ -56,7 +56,7 @@ Let's convert our `Course` projection into a `SingleStreamProjection` that will 
 Again, a full listing of the code will be provided at the end of this section, but here is the important part.
 
 First we will remove the `Create` handler in the `Course` projection:
-
+<DoThis text="Remove the Create handler in the Course projection" >
 ```csharp showLineNumbers title="CourseProjection.cs" del={8-14}
 public record Course(
     public Guid Id { get; set; }
@@ -74,8 +74,11 @@ public record Course(
         };
 )
 ```
+</DoThis>
+And we will move it to a new class that inherits from `SingleStreamProjection`. You can put this right after the `Course` record in the same file, or you can create a new file called `CourseProjection.cs`. I will show it in a new file here, but you can choose where to put it:
 
-And we will move it to a new class that inherits from `SingleStreamProjection`:
+<DoThis label="Create a new class called CourseProjection" >
+
 
 ```csharp showLineNumbers title="CourseProjection"
 public class CourseProjection : SingleStreamProjection<Course, Guid>
@@ -91,11 +94,12 @@ public class CourseProjection : SingleStreamProjection<Course, Guid>
     }
 }
 ```
-
+</DoThis>
 That's simply the old `Create` method moved to a new class. That class inherits from `SingleStreamProjection<Course, Guid>`, which tells the Critter Stack that this projection is for a single stream of events that has a `Guid` as its Id.
 
 The last step will be to tell Marten about the existence of this so it can do it's "magic". We will do that in the `Program.cs` file, where we add Marten to the service collection:
 
+<DoThis label="Add the CourseProjection to the Marten Configuration" >
 ```csharp showLineNumbers title="Program.cs" add={7}
 builder.Services.AddMarten(config =>
     {
@@ -108,6 +112,7 @@ builder.Services.AddMarten(config =>
     }).IntegrateWithWolverine()
     .UseLightweightSessions();
 ```
+</DoThis>
 
 Now, when we add a course (add a `CourseCreated` event), the `CourseProjection` will be updated in real-time, and we can retrieve all courses from the database. There will be a new table in the database called `mt_courses` that will contain all the courses that have been created.
 
@@ -120,15 +125,41 @@ We don't have to make any changes to our existing `POST` and `GET /api/course/{i
 
 Using Marten's `IDocumentSession`, we can do that pretty easily. Add a method to your `Courses/Api` class like this:
 
-```csharp showLineNumbers title="Courses/Api.cs"
-[WolverineGet("/api/courses")]
-public async static Task<Ok<IReadOnlyList<Course>>> Get(IDocumentSession session)
-{
-    var response = await session.Query<Course>().ToListAsync();
+<DoThis label="Add a new endpoint to get all courses" >
+```csharp showLineNumbers=false title="Courses/Api.cs" ins={23-29}
 
-    return TypedResults.Ok(response);
+public static class Api
+{
+
+    [WolverinePost("/api/courses")]
+    public static (Created<CreateCourseResponse>, IStartStream) Post(CreateCourseRequest request)
+    {
+
+        var op = MartenOps.StartStream<Course>(new CourseCreated(request.Title, request.Description,
+            request.NumberOfDays));
+        var response = new CreateCourseResponse(
+            Id: op.StreamId,
+            Title: request.Title,
+            Description: request.Description,
+            NumberOfDays: request.NumberOfDays
+        );
+        var responseMessage = TypedResults.Created($"/api/courses/{response.Id}", response);
+        return (responseMessage, op);
+    }
+
+    [WolverineGet("/api/courses/{id:guid}")]
+    public static Course Get([ReadAggregate] Course course) => course;
+
+    [WolverineGet("/api/courses")]
+    public async static Task<Ok<IReadOnlyList<Course>>> Get(IDocumentSession session)
+    {
+        var response = await session.Query<Course>().ToListAsync();
+
+        return TypedResults.Ok(response);
+    }
 }
 ```
+</DoThis>
 
 That'll do it. 
 

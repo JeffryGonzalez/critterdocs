@@ -5,6 +5,7 @@ title: Assigning Instructors
 import { Aside } from '@astrojs/starlight/components';
 import  VimeoVideo  from '@components/VimeoVideo.astro';
 import { Tabs, TabItem } from '@astrojs/starlight/components';
+import DoThis from '@components/DoThis.astro';
 
 ## What We Will Learn
 
@@ -24,24 +25,17 @@ Hopefully you have a sense of what we are going to do here. We aren't going to h
 
 Let's start with adding an event:
 
+<DoThis label="Define the InstructorAssignedToCourse Event" >
+
 ```csharp title="Api.cs"
 public record AssignInstructorToCourse(string Instructor);
 ```
-
-We'll create an HTTP endpoint to append this event to the stream:
-
-```csharp title="Api.cs"
-[WolverinePost("/api/courses/{id:guid}/instructor"), EmptyResponse]
-public static InstructorAssignedToCourse AssignInstructor(
-    [Aggregate] Course course, AssignInstructorToCourse req) => 
-        new InstructorAssignedToCourse(req.Instructor);
-```
-
-You can see this is very similar to the `DELETE` endpoint we created earlier. The `AssignInstructor` method appends the `InstructorAssignedToCourse` event to the stream identified by the `Course` aggregate. If that Course doesn't exist, it'll return a 404. 
+</DoThis>
+ee this is very similar to the `DELETE` endpoint we created earlier. The `AssignInstructor` method appends the `InstructorAssignedToCourse` event to the stream identified by the `Course` aggregate. If that Course doesn't exist, it'll return a 404. 
 
 ## Updating the Projection
 Now we need to update our projection to handle this new event and add a property to our `Course` record to hold the instructor.
-
+<DoThis label="Update the Course Projection" >
 ```csharp title="CourseProjection.cs" ins={9, 26-27}
 public record Course
 {
@@ -72,12 +66,56 @@ public class CourseProjection : SingleStreamProjection<Course, Guid>
         => course with { Instructor = evt.Instructor };
 }
 ```
+</DoThis>
 
-And that is *it*. We are done! The frontend should be pretty functional at this point. 
+## Add The Endpoint
+We'll create an HTTP endpoint to append this event to the stream:
 
-Hopefully we did enough here that you:
+<DoThis label="Add the AssignInstructor Endpoint" >
+```csharp showLineNumbers=false title="Courses/Api.cs" ins={34-37}
 
-a. Have a "feel" for how the Critter Stack works
-b. Can begin to see that this gets a little *redundant* (at least for the easy cases). That's a good thing.
-c. Have a lot of questions. We'll get to those in future lessons, and you can always join the discord and ask them.
+public static class Api
+{
+    [WolverinePost("/api/courses")]
+    public static (Created<CreateCourseResponse>, IStartStream) Post(CreateCourseRequest request)
+    {
+
+        var op = MartenOps.StartStream<Course>(new CourseCreated(request.Title, request.Description,
+            request.NumberOfDays));
+        var response = new CreateCourseResponse(
+            Id: op.StreamId,
+            Title: request.Title,
+            Description: request.Description,
+            NumberOfDays: request.NumberOfDays
+        );
+        var responseMessage = TypedResults.Created($"/api/courses/{response.Id}", response);
+        return (responseMessage, op);
+    }
+
+    [WolverineGet("/api/courses/{id:guid}")]
+    public static Course Get([ReadAggregate] Course course) => course;
+
+    [WolverineGet("/api/courses")]
+    public async static Task<Ok<IReadOnlyList<Course>>> Get(IDocumentSession session)
+    {
+        var response = await session.Query<Course>().ToListAsync();
+
+        return TypedResults.Ok(response);
+    }
+
+    [WolverineDelete("/api/courses/{id:guid}"), EmptyResponse]
+    public static CourseDeleted Delete([Aggregate] Course course) => new CourseDeleted();
+
+
+    [WolverinePost("/api/courses/{id:guid}/instructor"), EmptyResponse]
+    public static InstructorAssignedToCourse AssignInstructor(
+        [Aggregate] Course course, AssignInstructorToCourse req) => 
+            new InstructorAssignedToCourse(req.Instructor);
+}
+```
+
+</DoThis>
+
+
+
 

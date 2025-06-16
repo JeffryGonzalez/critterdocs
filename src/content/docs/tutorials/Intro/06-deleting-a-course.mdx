@@ -6,6 +6,7 @@ title: Deleting a Course
 import { Aside } from '@astrojs/starlight/components';
 import  VimeoVideo  from '@components/VimeoVideo.astro';
 import { Tabs, TabItem } from '@astrojs/starlight/components';
+import DoThis from '@components/DoThis.astro';
 
 
 ## What We Will Learn
@@ -24,19 +25,57 @@ In this section we will learn how to implement an `HTTP DELETE` endpoint that ad
 
 ## Define the Event 
 
-In your `Courses/Api.cs` file, add the following event:
+In your `Courses/Api.cs` file, add the following event, near our `CourseCreated` event:
+
+
+
+<DoThis label="Define the CourseDeleted Event" >
 
 ```csharp
 public record CourseDeleted();
 ```
+</DoThis>
 
 Easy, right? We'll add an HTTP `Delete` endpoint to our `Api` class to append this event to the stream. 
 
-```csharp title="Api"
-[WolverineDelete("/api/courses/{id:guid}"), EmptyResponse]
-public static CourseDeleted Delete([Aggregate] Course course) => new CourseDeleted();
+<DoThis label="Add the Delete Endpoint" >
+```csharp showLineNumbers title="Courses/Api.cs" ins={30-31}
+
+public static class Api
+{
+    [WolverinePost("/api/courses")]
+    public static (Created<CreateCourseResponse>, IStartStream) Post(CreateCourseRequest request)
+    {
+
+        var op = MartenOps.StartStream<Course>(new CourseCreated(request.Title, request.Description,
+            request.NumberOfDays));
+        var response = new CreateCourseResponse(
+            Id: op.StreamId,
+            Title: request.Title,
+            Description: request.Description,
+            NumberOfDays: request.NumberOfDays
+        );
+        var responseMessage = TypedResults.Created($"/api/courses/{response.Id}", response);
+        return (responseMessage, op);
+    }
+
+    [WolverineGet("/api/courses/{id:guid}")]
+    public static Course Get([ReadAggregate] Course course) => course;
+
+    [WolverineGet("/api/courses")]
+    public async static Task<Ok<IReadOnlyList<Course>>> Get(IDocumentSession session)
+    {
+        var response = await session.Query<Course>().ToListAsync();
+
+        return TypedResults.Ok(response);
+    }
+
+    [WolverineDelete("/api/courses/{id:guid}"), EmptyResponse]
+    public static CourseDeleted Delete([Aggregate] Course course) => new CourseDeleted();
+}
 ```
 
+</DoThis>
 Again, other ways we could implement this, but you can't argue the simplicity of this.
 
 Notice the `EmptyResponse` attribute. This tells Wolverine that the thing we are returning (`CourseDeleted`) is not a response to be sent to the client, but rather an event that is being appended to the stream identified by the Stream Id of the `Course` aggregate.
@@ -47,6 +86,7 @@ Also notice the use of the `[Aggregate]` attribute here, instead of the `[ReadAg
 
 The only thing left to do is update our projection to indicate that the `Course` should be considered "deleted" when it sees the `CourseDeleted` event.
 
+<DoThis label="Update the CourseProjection" >
 ```csharp title="CourseProjection" ins={13}
 public class CourseProjection : SingleStreamProjection<Course, Guid>
 {
@@ -63,6 +103,7 @@ public class CourseProjection : SingleStreamProjection<Course, Guid>
     public bool ShouldDelete(CourseDeleted evt) => true;
 }
 ```
+</DoThis>
 
 That's it. We have two methods in our projection now: `Create` and `ShouldDelete`. The `Create` method is called when the `CourseCreated` event is appended to the stream and it creates a new `Course` projection, and the `ShouldDelete` method is called when the `CourseDeleted` event is appended to the stream. If that `ShouldDelete` returns a true, then the projection is considered deleted, and since we are using a `Live` projection, it will be removed from the database table (`mt_courses`). 
 

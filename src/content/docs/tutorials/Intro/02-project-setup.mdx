@@ -4,6 +4,7 @@ title: Project Setup
 
 import { Card } from '@astrojs/starlight/components';
 import { Steps } from '@astrojs/starlight/components';
+import DoThis from '@components/DoThis.astro';
 
 You will need a few things to get started here:
 
@@ -11,64 +12,28 @@ You will need a few things to get started here:
 - A .NET SDK (Version 9.0 or later)
 - A Code Editor (Like Visual Studio, Visual Studio Code, NeoVim, Rider, etc.)
     - I will use Jetbrains Rider in this course, but you can use whatever you like. You can get a free license for Rider for non-commercial use, etc. [See Rider](https://www.jetbrains.com/rider/)
-- Git
-- A fairly recent version of Node.js (Version 18 or later) and NPM (Just to get started, but you can also dip into the frontend later, if you are interested) You can also create the project from scratch if you prefer not to use Node. See the instructions at the bottom of this page for details.
 
-## Getting the Starter Code
+<DoThis label="Get the Starter Code" >
 
-Find (or create) a nice clean directory to work in, and then run the following command to clone the starter code for this course:
 
+You can download a `zip` file with the starter code for this course from [CoursesSolution_Starter.zip](/tutorials/CoursesSolution_Starter.zip)
+</DoThis>
+
+Extract the zip file to a directory of your choice and open it with the editor of your choice.
+
+In the extracted directory, you will find a `docker-compose.yml` file. Use that to start the Critter Stack by running the following command in your terminal:
+
+<DoThis label="Start Docker with a Postgres Database" >
 ```bash
-npx gitpick JeffryGonzalez/critterdocs/tree/main/projects/JasperHappyPath_starter
-```
-This will create a new directory called `JasperHappyPath_starter` in your current directory, and it will copy the starter code into that directory.
-
-Make sure your container runtime is running, and then run the following command to start the Critter Stack:
-
-```bash
-cd JasperHappyPath_starter
+cd CoursesSolution
 docker compose up -d
 ```
+</DoThis>
 
-In the `JasperHappyPath_starter` directory, `CoursesSolution/CoursesSolution.sln` file. Open that in your editor and run the application.
+### The Final Code 
+You can also pull down a "final" working copy of this project using the same process as above, but using the following zip file:
+[CoursesSolution_Final.zip](/tutorials/CoursesSolution_Final.zip)
 
-After the application starts, your browser should open to `https://localhost:7203/app/` and you should see our frontend. 
 
-If you click on the "Courses" link in the header, the application will *attempt* to load a list of courses from our API, but it will fail because we haven't implemented the API yet.
-
-<Card title="The Final Code">
-You can also pull down a "final" working copy of this project using the same process as above, but using the following command:
-
-```bash
-npx gitpick JeffryGonzalez/critterdocs/tree/main/projects/JasperHappyPath_Final
-```
 In another directory. Make sure you start the container!
-</Card>
 
-## Alternative Ways to Create the Project
-
-### Download a Zip File of the Starter Project
-
-You can download an extract a zip file of the starter project from [here](https://github.com/)
-
-> TODO: Create the Zip File.
-
-### Create the Project by Hand
-
-
-If you want to create the project by hand, you can follow these steps:
-
-<Steps>
-1. Create a new .NET 9 Empty Web API project. You can use your IDE of choice, or run the following command in an empty directory in your terminal:
-    ```bash
-    dotnet new sln -o CoursesSolution
-    cd CoursesSolution
-    dotnet new web -n Courses.Api
-    dotnet new sln -o CoursesSolution
-    cd Courses.Api
-    dotnet add package WolverineFx.Http --version 4.2.0
-    dotnet add package WolverineFx.Http.Marten --version 4.2.0
-    ```
-2. (Optional) if you want the frontend code, you can create a `wwwroot` directory in the `Courses.Api` project and add your frontend code there. You can use any frontend framework you like, but for this tutorial, we will use a simple Angular app to make the API calls.
-
-</Steps>

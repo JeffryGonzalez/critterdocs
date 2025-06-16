@@ -5,7 +5,7 @@ title: Adding and Retrieving A Course
 import { Aside } from '@astrojs/starlight/components';
 import  VimeoVideo  from '@components/VimeoVideo.astro';
 import { Tabs, TabItem } from '@astrojs/starlight/components';
-
+import DoThis from '@components/DoThis.astro';
 
 
 
@@ -38,12 +38,23 @@ I'm going to implement this as a static class with my endpoints, but you can als
 Assuming you've created .NET APIs before, you are no-doubt familiar with the the various attributes that you can use to define your endpoints, like `[HttpGet]`, `[HttpPost]`, etc. Wolverine has its own set of attributes that you can use to define your endpoints, and they are very similar to the ones you are used to, however
 they add considerable "super powers" when you are implementing your backend with the "Critter Stack", especially when it comes to working with Marten and the event store.
 
+<DoThis label="Create a new file called Courses/Api.cs">
+
+```csharp showLineNumbers=false title="Courses/Api.cs"
+public static class Api
+{
+    // We'll add our endpoints here
+}
+```
+</DoThis>
 
 ### Defining a Read Model Projection
 
 We will start by creating a couple of "Models" that we will use to represent the data we want to send and receive from our API, and what we will return. I'm going to use C# records for this, but you can use classes if you prefer. Nothing special here.
 
-```csharp showLineNumbers title="Courses/Api.cs"
+<DoThis label="Define the Models">
+
+```csharp showLineNumbers=false title="Courses/Api.cs" ins={1-5, 7-12}
 public record CreateCourseRequest(
     string Title,
     string Description,
@@ -56,9 +67,19 @@ public record CreateCourseResponse(
     string Description, 
     int NumberOfDays
     );
+
+public static class Api
+{
+    // We'll add our endpoints here
+}
 ```
+</DoThis>
 
 So, when they do a `POST /api/courses` request, they will send us a `CreateCourseRequest` object, and we will return a `CreateCourseResponse` object. In an HTTP file, it might look like this:
+
+<DoThis label="Make A Request">
+
+In the `courses.http` file, we can define a request like this:
 
 ```http
 POST /api/courses HTTP/1.1
@@ -84,18 +105,38 @@ Location: /api/courses/d3b8f5c2-4f1e-4b2a-9c3e-6f1e4b2a9c3e
   "numberOfDays": 5
 }
 ```
-
+</DoThis>
 In later tutorials, we will introduce validation (Wolverine has some great validation features based on the `FluentValidation` library), but for now, we will just assume that the request is valid.
 
 Next, we'll define our Event. This is the event that will be stored in the event store when a course is created. We will use this event to create a projection.
 
-```csharp showLineNumbers title="Courses/Api.cs"
+<DoThis label="Define the CourseCreated Event">
+```csharp showLineNumbers=false title="Courses/Api.cs" ins={1-5}
  public record CourseCreated(
     string Title,
     string Description,
     int NumberOfDays
     );
+
+public record CreateCourseRequest(
+    string Title,
+    string Description,
+    int NumberOfDays
+    );
+
+public record CreateCourseResponse(
+    Guid Id, 
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+public static class Api
+{
+    // We'll add our endpoints here
+}
 ```
+</DoThis>
 Again, I'm using a C# record here, but you can use a class if you prefer. The important thing is that this event contains the data we need to create a course.
 
 A couple subtle things to note here:
@@ -110,8 +151,9 @@ An important thing to keep in mind is that unlike traditional relational databas
 
 And that's going to be pretty easy for now, because we only have one event (`CourseCreated`) that we will use to create the course. 
 
+<DoThis label="Define the Course Projection">
 
-```csharp showLineNumbers title="Courses/Api.cs"
+```csharp showLineNumbers=false title="Courses/Api.cs" ins={1-7}
 public record Course(
     public Guid Id { get; set; }
     public int Version { get; set; }
@@ -119,7 +161,32 @@ public record Course(
     public string Description { get; set; } = string.Empty;
     public int NumberOfDays { get; set; }
 )
+
+ public record CourseCreated(
+    string Title,
+    string Description,
+    int NumberOfDays
+    );
+
+public record CreateCourseRequest(
+    string Title,
+    string Description,
+    int NumberOfDays
+    );
+
+public record CreateCourseResponse(
+    Guid Id, 
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+public static class Api
+{
+    // We'll add our endpoints here
+}
 ``` 
+</DoThis>
 
 This is a simple record that contains the properties we need to represent a course. The `Id` property is the unique identifier for the course, and the `Version` property is used to keep track of the version of the course. The `Title`, `Description`, and `NumberOfDays` properties are used to represent the course data.
 
@@ -133,8 +200,8 @@ Marten uses a convention-based approach to handle events. It looks for methods t
 
 Modify the `Course` record to look like this:
 
-
-```csharp showLineNumbers title="Courses/Api.cs" ins={8-14}
+<DoThis label="Implement Create Method">
+```csharp showLineNumbers=false title="Courses/Api.cs" ins={8-14}
 public record Course(
     public Guid Id { get; set; }
     public int Version { get; set; }
@@ -150,7 +217,32 @@ public record Course(
             NumberOfDays = courseCreated.NumberOfDays 
         };
 )
+
+ public record CourseCreated(
+    string Title,
+    string Description,
+    int NumberOfDays
+    );
+
+public record CreateCourseRequest(
+    string Title,
+    string Description,
+    int NumberOfDays
+    );
+
+public record CreateCourseResponse(
+    Guid Id, 
+    string Title, 
+    string Description, 
+    int NumberOfDays
+    );
+
+public static class Api
+{
+    // We'll add our endpoints here
+}
 ``` 
+</DoThis>
 
 <Aside type="note">Notice we aren't implementing any interfaces we don't own, we aren't inheriting from any base classes, and we aren't using any attributes. This is just a simple record that Marten will use to create the course from the `CourseCreated` event.</Aside>
 
@@ -164,8 +256,10 @@ Now we can bring it all together. We need an endpoint that the client can:
 <Aside type="tip">In the video walkthrough I show a more *verbose* way to accomplish this which may help you understand this better if you are a little confused.</Aside>
 
 In the `Courses/Api.cs` file, make the `Api` class a static class, and then add the following code:
-    
-```csharp showLineNumbers title="Courses/Api.cs" ins={3-17} mark="static class"
+
+<DoThis label="Implement the POST /api/courses Endpoint">
+```csharp showLineNumbers=false title="Courses/Api.cs" ins={4-18}
+// leaving out events and models for brevity
 public static class Api 
 {
     [WolverinePost("/api/courses")]
@@ -185,7 +279,7 @@ public static class Api
     }
 }
 ```
-
+</DoThis>
 <Aside type="note">I am leaving out the `using` statements for brevity. A complete code listing will be provided at the end of this page</Aside>
 
 Some notes:
@@ -217,7 +311,9 @@ You *could* do that if you got paid by the hour or something. I'll admit the fir
 
 All we need to add to our `Api` class is the following code:
 
-```csharp showLineNumbers title="Courses/Api.cs" ins={20-21}
+<DoThis label="Implement the GET /api/courses/{id} Endpoint">
+
+```csharp showLineNumbers=false title="Courses/Api.cs" ins={20-21}
 public static class Api 
 {
     [WolverinePost("/api/courses")] 
@@ -242,6 +338,7 @@ public static class Api
 }
 
 ```
+</DoThis>
 
 Pretty cool, right? No service to inject, no database to query, no SQL (or LINQ) to write, no ORM to configure. Just a simple method that takes a `Course` projection as a parameter, and returns it.
 

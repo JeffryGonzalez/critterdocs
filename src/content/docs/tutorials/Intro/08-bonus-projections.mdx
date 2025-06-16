@@ -4,6 +4,7 @@ title: Create a New Projection
 
 import { Aside } from '@astrojs/starlight/components';
 import { Card } from '@astrojs/starlight/components';
+import DoThis from '@components/DoThis.astro';
 
 <Card title="Bonus Content">
 To really help the idea of projections "sink in", I wanted to show you another example of a projection. This one will be a little more complex, but it will be a good way to "whet your appetite" for more, and, frankly, possibly address your anxiety about deleting projections. I know that is one thing that freaked me out when I was first getting started.
@@ -17,9 +18,10 @@ We could also add a `GET /api/course-archive/{id}` endpoint to get the history o
 
 ## Adding a Projection and Endpoint
 
+<DoThis label="Add a New Source Code File and Projection">
 Let's create a new source code file in the `Courses` directory in our project called `CourseArchive.cs`. We'll define our read model as a record in that file like this:
 
-```csharp title="CourseArchive.cs"
+```csharp title="Courses/CourseArchive.cs"
 public record CourseHistory
 {
     public Guid Id { get; set; }
@@ -35,10 +37,12 @@ public record CourseHistory
 }
 public record InstructorAssignment(string Instructor, DateTimeOffset DateAssigned);
 ```
+</DoThis>
 
 We'll create after that a new `SingleStreamProjection` for this read model:
 
-```csharp title="CourseArchive.cs"
+<DoThis label="Add the CourseHistoryProjection">
+```csharp title="Courses/CourseArchive.cs"
 public class CourseHistoryProjection : SingleStreamProjection<CourseHistory, Guid>
 {
     public static CourseHistory Create(IEvent<CourseCreated> evt)
@@ -73,6 +77,7 @@ public class CourseHistoryProjection : SingleStreamProjection<CourseHistory, Gui
    
 }
 ```
+</DoThis>
 
 Some notes about this:
 
@@ -84,23 +89,46 @@ Some notes about this:
 
 We can now add an endpoint to get all the courses in the archive:
 
-```csharp title="CourseArchive.cs"
-public static class CourseArchive
+<DoThis label="Create a Compiled Query">
+
+Just to show one other way to get a list of documents from a projection, we will use a compiled query to get all the `CourseHistory` records. This is not strictly necessary, but it is a good practice to use compiled queries for performance reasons, especially when querying large datasets.
+It also allows you to centralize your query logic. In this example, we will use a compiled query to get all the `CourseHistory` records from the database as sort them by creation date in descending order.
+
+```csharp title="Courses/CourseArchive.cs"
+public class CourseArchiveCompiledQuery : ICompiledListQuery<CourseHistory>
 {
-    [WolverineGet("/api/course-archive")]
-    public static async Task<Ok<IReadOnlyList<CourseHistory>>> Get(IDocumentSession session)
+    public Expression<Func<IMartenQueryable<CourseHistory>, IEnumerable<CourseHistory>>> QueryIs()
     {
-        var response = await session.Query<CourseHistory>().ToListAsync();
-        return TypedResults.Ok(response);
+        return q => q.OrderByDescending(c => c.DateCreated);
     }
 }
 ```
 
-Since we are using the `IDocumentSession` to query the `CourseHistory` records, we can just return the results as an `IReadOnlyList<CourseHistory>`. This will give us a list of all the courses that have ever been created, deleted, and instructors assigned to them. But we will have to tell Marten again about the existence of this projection so that the `mt_coursehistory` table is materialized. We'll again use a `Live` projection, but since this is *statistical*, it's a good use case for an `Async` projection.  We'll stick with the `Live` projection for now, but you can change it to `Async` if you want to explore that later.
+</DoThis>
 
-Here's an *abbreviated* version of the `Program.cs` file that includes the new projection, with the additions highlighted (note: just add the new stuff to your existing `Program.cs` file):
+Finally, we can create the endpoint to return the list of `CourseHistory` records:
 
-```diff lang="csharp"
+<DoThis label="Add the Course Archive Endpoint">
+```csharp title="Courses/CourseArchive.cs" showLineNumbers=false
+public static class CourseArchive
+{
+    [WolverineGet("/api/course-archive")]
+    public static CourseArchiveCompiledQuery Get()
+    {
+        return new CourseArchiveCompiledQuery();
+    }
+}
+```
+
+</DoThis>
+
+Notice unlike the example from the list of courses, we are not using the `IDocumentSession` to query the `CourseHistory` records. Instead, we are returning a compiled query that will be executed by Marten when the endpoint is called. This is very optimized, and will actually serialize the JSON returned from the query directly to the client.
+
+
+The final step is to update the `Program.cs` file to register the new projection and endpoint configuration:
+
+<DoThis label="Update Program.cs">
+```csharp title="Program.cs" ins={29, 39-42} del={38}
 using System.Text.Json.Serialization;
 using Courses.Api.Courses;
 using JasperFx.Events.Projections;
@@ -112,15 +140,16 @@ using Wolverine.Marten;
 
 var builder = WebApplication.CreateBuilder(args);
 
-+builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(o =>
-+{
-+   o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;   
-+ });
+builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi(o =>
+{
+    o.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
+
 builder.Host.UseWolverine(options =>
 {
     options.Policies.AutoApplyTransactions();
 });
-builder.Services.AddDirectoryBrowser();
+
 builder.Services.AddMarten(config =>
     {
         var connectionString = builder.Configuration.GetConnectionString("db") ??
@@ -128,17 +157,43 @@ builder.Services.AddMarten(config =>
         config.Connection(connectionString);
 
         config.Projections.Add<CourseProjection>(ProjectionLifecycle.Inline);
-+        config.Projections.Add<CourseHistoryProjection>(ProjectionLifecycle.Inline);
-    }).IntegrateWithWolverine()
+        config.Projections.Add<CourseHistoryProjection>(ProjectionLifecycle.Inline);
+    })
+    .IntegrateWithWolverine()
     .UseLightweightSessions();
 
 builder.Services.AddWolverineHttp();
 
+var app = builder.Build();
+
 app.MapWolverineEndpoints();
+app.MapWolverineEndpoints(config =>
+{
+    config.UseMartenCompiledQueryResultPolicy();
+});
+
+// The frontend app is served from the "app" directory in the wwwroot folder
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(Path.Combine(builder.Environment.WebRootPath, "app")),
+    RequestPath = "/app",
+});
+
+// Serve the index.html file for any unmatched requests under /app
+app.MapWhen(context => context.Request.Path.StartsWithSegments("/app"), appBuilder =>
+{
+    appBuilder.UseRouting();
+    appBuilder.UseEndpoints(endpoints =>     {         
+        endpoints.MapFallbackToFile("app/index.html");     
+    }); 
+});
+
+// Send a 404 response for any unmatched API requests instead of serving index.html
+app.Map("/api/{*:}", Results.NotFound);
 
 app.Run();
-``` 
-
+```
+</DoThis>
 Some notes:
 
 The `builder.Services.ConfigureSystemTextJsonForWolverineOrMinimalApi` line is optional, but it sets the default JSON serialization options for Wolverine and the Minimal API to ignore null values. This is a good practice to reduce the size of the JSON payloads, and also means that when we serialize this to the client, it won't include the `DateDeleted` property if it is null, which is the case for courses that have not been deleted yet.
@@ -200,11 +255,3 @@ If you make a `GET https://localhost:7203/api/course-archive` request after addi
 For example, you can see exactly when each course was created, and, if deleted, when it was deleted. You can see that `Jeffry Gonzalez` is the instructor for the `Event Sourcing 101` course, and that `Jeremy Miller` is the current instructor for the `Advanced Projections with the Critter Stack` course, replacing Jeff Gonzalez when he chickened out. Jeremy was also the instructor `Building a "CRUD" Application with Entity Framework and .NET` course before it was deleted.
 
 
-<Card title="The Final Code">
-Reminder: you can pull down my final code for this project by creating a new directory and running the following command:
-
-```bash
-npx gitpick JeffryGonzalez/critterdocs/tree/main/projects/JasperHappyPath_Final
-```
-Make sure you start the container!
-</Card>
